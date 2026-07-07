@@ -2,120 +2,71 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Dynamic CSV Layer Graph — Semantic Zoom</title>
+<title>CSV layer graph — semantic zoom</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 <style>
-  :root {
-    --bg: #12141a; 
-    --panel: #1a1d25; 
-    --line: #2a2e38;
-    --text: #e8e8ea; 
-    --muted: #8a8d98; 
-    --err: #e8746a;
-    --accent: #3fc9a0;
+  :root{
+    --bg:#12141a; --panel:#1a1d25; --line:#2a2e38;
+    --text:#e8e8ea; --muted:#8a8d98; --err:#e8746a;
   }
-  * { box-sizing: border-box; }
-  body { 
-    margin: 0; 
-    background: var(--bg); 
-    color: var(--text); 
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; 
+  *{box-sizing:border-box;}
+  body{margin:0; background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}
+  #app{max-width:1000px; margin:0 auto; padding:20px;}
+  h1{font-size:16px; font-weight:600; margin:0 0 4px;}
+  .sub{font-size:12px; color:var(--muted); margin-bottom:16px;}
+  #controls{
+    display:flex; flex-wrap:wrap; gap:16px; align-items:flex-end;
+    background:var(--panel); border:1px solid var(--line); border-radius:12px;
+    padding:14px 16px; margin-bottom:14px;
   }
-  #app { max-width: 1000px; margin: 0 auto; padding: 20px; }
-  h1 { font-size: 16px; font-weight: 600; margin: 0 0 4px; }
-  .sub { font-size: 12px; color: var(--muted); margin-bottom: 16px; }
-  
-  #controls {
-    display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end;
-    background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
-    padding: 14px 16px; margin-bottom: 14px;
+  .field{display:flex; flex-direction:column; gap:4px;}
+  .field label{font-size:11px; color:var(--muted);}
+  .field input[type=file]{font-size:12px; color:var(--text); max-width:220px;}
+  button{
+    font-size:12px; color:var(--text); background:#242832; border:1px solid var(--line);
+    border-radius:6px; padding:7px 12px; cursor:pointer;
   }
-  .field { display: flex; flex-direction: column; gap: 4px; }
-  .field label { font-size: 11px; color: var(--muted); }
-  .field input[type=file] { font-size: 12px; color: var(--text); max-width: 220px; }
-  
-  button {
-    font-size: 12px; color: var(--text); background: #242832; border: 1px solid var(--line);
-    border-radius: 6px; padding: 7px 12px; cursor: pointer; font-weight: 500;
-  }
-  button:hover { border-color: var(--muted); background: #2c313d; }
-  button#loadSample { background: #23423b; border-color: #3fc9a044; color: #a6ebd7; }
-  button#loadSample:hover { background: #2b544a; border-color: var(--accent); }
-  button.ghost { background: none; color: var(--muted); }
-  
-  #status { font-size: 12px; margin-bottom: 10px; min-height: 16px; font-family: monospace; }
-  #status.error { color: var(--err); }
-  #status.ok { color: #6fcf97; }
-  
-  #legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 11px; color: var(--muted); margin-bottom: 10px; }
-  #legend .chip { display: flex; align-items: center; gap: 6px; }
-  #legend .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
-  
-  #breadcrumb { 
-    font-size: 13px; 
-    color: var(--muted); 
-    margin-bottom: 14px; 
-    min-height: 40px;
-    background: var(--panel);
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    padding: 10px 14px;
-    display: flex;
-    align-items: center;
-    gap: 2px;
-  }
-  #breadcrumb span { cursor: pointer; color: var(--text); font-weight: 500; }
-  #breadcrumb span:hover { text-decoration: underline; color: var(--accent); }
-  #breadcrumb .sep { color: var(--muted); margin: 0 6px; cursor: default; }
-  
-  #canvas-wrap { 
-    background: var(--panel); 
-    border: 1px solid var(--line); 
-    border-radius: 12px; 
-    overflow: hidden; 
-    min-height: 560px;
-    position: relative;
-  }
-  svg { display: block; width: 100%; cursor: grab; }
-  
-  .node circle { stroke-width: 1.5px; cursor: pointer; }
-  .node text { 
-    font-size: 12px; 
-    font-weight: 600; 
-    fill: #ffffff; 
-    pointer-events: none; 
-    text-anchor: middle; 
-    dominant-baseline: central;
-    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9), 0 1px 6px rgba(0, 0, 0, 0.9);
-  }
-  
-  .edge { stroke-width: 1.2px; fill: none; transition: opacity 0.3s ease; }
-  .edge.horizontal { stroke-dasharray: 3,3; }
-  
-  .hint { font-size: 12px; color: var(--muted); margin-top: 10px; line-height: 1.6; }
-  code { background: #242832; padding: 1px 5px; border-radius: 4px; font-size: 11px; color: #e88a6a; }
-  #empty-state { 
-    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-    text-align: center; color: var(--muted); font-size: 13px; 
-  }
+  button:hover{border-color:var(--muted);}
+  button.ghost{background:none; color:var(--muted);}
+  #status{font-size:12px; margin-bottom:10px; min-height:16px;}
+  #status.error{color:var(--err);}
+  #status.ok{color:#6fcf97;}
+  #legend{display:flex; gap:14px; flex-wrap:wrap; font-size:11px; color:var(--muted); margin-bottom:10px;}
+  #legend .chip{display:flex; align-items:center; gap:6px;}
+  #legend .dot{width:10px; height:10px; border-radius:50%; display:inline-block;}
+  #breadcrumb{font-size:13px; color:var(--muted); margin-bottom:10px; min-height:18px;}
+  #breadcrumb span{cursor:pointer; color:var(--text);}
+  #breadcrumb span:hover{text-decoration:underline;}
+  #breadcrumb .sep{color:var(--muted); margin:0 6px; cursor:default;}
+  #canvas-wrap{background:var(--panel); border:1px solid var(--line); border-radius:12px; overflow:hidden;}
+  svg{display:block; width:100%; cursor:grab;}
+  .node circle{stroke-width:1.5px; cursor:pointer;}
+  .node text{font-size:11px; font-weight:500; fill:var(--text); pointer-events:none; text-anchor:middle; dominant-baseline:central;}
+  .edge{stroke-width:1.2px; fill:none;}
+  .edge.horizontal{stroke-dasharray:3,3;}
+  .hint{font-size:12px; color:var(--muted); margin-top:10px; line-height:1.6;}
+  code{background:#242832; padding:1px 5px; border-radius:4px; font-size:11px;}
+  #empty-state{padding:60px 20px; text-align:center; color:var(--muted); font-size:13px;}
 </style>
 </head>
 <body>
 <div id="app">
-  <h1>CSV Layer Graph</h1>
-  <div class="sub">Upload custom nodes and edges CSV configurations to render an n-tier dynamic semantic zoom workspace.</div>
+  <h1>CSV layer graph</h1>
+  <div class="sub">Upload a nodes CSV and an edges CSV to render a multi-layer semantic zoom graph. Any number of layers is supported.</div>
 
   <div id="controls">
     <div class="field">
-      <label>Nodes CSV (<code>id,label,layer,layer_name</code>)</label>
+      <label>Nodes CSV — columns: <code>id,label,layer</code> (+ optional <code>layer_name</code>)</label>
       <input type="file" id="nodesFile" accept=".csv">
     </div>
     <div class="field">
-      <label>Edges CSV (<code>source,target,type</code>)</label>
+      <label>Edges CSV — columns: <code>source,target,type</code></label>
       <input type="file" id="edgesFile" accept=".csv">
     </div>
-    <button id="loadSample">✨ Load sample data</button>
+    <button id="loadSample">Load sample data</button>
+    <button class="ghost" id="dlNodes">Download nodes template</button>
+    <button class="ghost" id="dlEdges">Download edges template</button>
     <button class="ghost" id="resetView">Reset view</button>
   </div>
 
@@ -124,22 +75,21 @@
   <div id="breadcrumb"></div>
 
   <div id="canvas-wrap">
-    <div id="empty-state">
-      <p>Upload your matrix CSV files or click <strong>✨ Load sample data</strong> above to play around.</p>
-    </div>
+    <div id="empty-state">Upload both CSVs, or click "Load sample data" to see it in action.</div>
     <svg id="viz" style="display:none;"></svg>
   </div>
 
   <div class="hint">
-    <strong>Interaction Guide:</strong> Click a node on an upper tier to isolate its semantic branches downstream. The layer immediately below will peek ahead while unrelated branches smoothly fade away. Use the structural bar above to navigate back up through the strata hierarchy.
+    <strong>How layers work:</strong> the <code>layer</code> column is an integer depth (1, 2, 3...). Rows connecting nodes on the <em>same</em> layer are drawn horizontally (dashed); rows connecting <em>different</em> layers are drawn vertically — this is detected automatically, you don't need a "kind" column.<br>
+    Click a node to drill into the next layer down (only the layer you're on stays fully solid; the layers before it fade into an ancestor trail; everything else stays hidden). Click the breadcrumb or "Reset view" to zoom back out.
   </div>
 </div>
 
 <script>
 const COLOR_PALETTE = ["#8b7fe8","#3fc9a0","#e88a6a","#e8b83f","#5fa8e8","#d46fc9","#7fbf5f","#e85f7f"];
 
-// Hardcoded interactive fallback data strings
-const SAMPLE_NODES_CSV = `id,label,layer,layer_name
+const SAMPLE_NODES_CSV =
+`id,label,layer,layer_name
 lang_latin,Latin,1,Languages
 lang_french,French,1,Languages
 lang_spanish,Spanish,1,Languages
@@ -160,7 +110,8 @@ d_baptism,ritual purification,3,Definitions
 d_land,solid ground / earth,3,Definitions
 d_territory,region under control,3,Definitions`;
 
-const SAMPLE_EDGES_CSV = `source,target,type
+const SAMPLE_EDGES_CSV =
+`source,target,type
 lang_latin,lang_french,DEVELOPED_INTO
 lang_latin,lang_spanish,DEVELOPED_INTO
 lang_latin,lang_italian,DEVELOPED_INTO
@@ -171,6 +122,10 @@ w_agua,lang_spanish,BELONGS_TO
 w_acqua,lang_italian,BELONGS_TO
 w_agua_pt,lang_portuguese,BELONGS_TO
 w_terra,lang_latin,BELONGS_TO
+w_terre,text,BELONGS_TO
+w_terre,french,BELONGS_TO
+w_tierra,spanish,BELONGS_TO
+w_terre,french,BELONGS_TO
 w_terre,lang_french,BELONGS_TO
 w_tierra,lang_spanish,BELONGS_TO
 w_terra_it,lang_italian,BELONGS_TO
@@ -218,24 +173,34 @@ document.getElementById("edgesFile").addEventListener("change", e => {
   if (!e.target.files[0]) return;
   parseFile(e.target.files[0], data => { rawEdgeRows = data; tryBuild(); });
 });
-
-// Auto-inject demo system logic
 document.getElementById("loadSample").addEventListener("click", () => {
   Papa.parse(SAMPLE_NODES_CSV, {header:true, dynamicTyping:true, skipEmptyLines:true, complete: r => { rawNodeRows = r.data; tryBuild(); }});
   Papa.parse(SAMPLE_EDGES_CSV, {header:true, dynamicTyping:true, skipEmptyLines:true, complete: r => { rawEdgeRows = r.data; tryBuild(); }});
 });
+document.getElementById("dlNodes").addEventListener("click", () => downloadText("nodes-template.csv", SAMPLE_NODES_CSV));
+document.getElementById("dlEdges").addEventListener("click", () => downloadText("edges-template.csv", SAMPLE_EDGES_CSV));
+
+function downloadText(filename, text){
+  const blob = new Blob([text], {type:"text/csv"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
 
 function tryBuild(){
   if (!rawNodeRows || !rawEdgeRows) return;
-  try {
+  try{
     buildAndRender(rawNodeRows, rawEdgeRows);
-  } catch(err) {
-    setStatus("Parsing Frame Aborted: " + err.message, "error");
+  } catch(err){
+    setStatus("Error building graph: " + err.message, "error");
   }
 }
 
-let sim, svg, g, linkSel, nodeSel, layerY, numLayers, nodeById, verticalChildren, pathAncestry;
-let focusIndex = 0, previousIndex = null, activeParentId = null;
+let sim, svg, g, linkSel, nodeSel, layerY, numLayers, nodeById, verticalChildren, verticalParents;
+let focusIndex = 0, activeParentId = null;
+let activeAncestors = new Set();
 
 function buildAndRender(nodeRows, edgeRows){
   document.getElementById("empty-state").style.display = "none";
@@ -254,7 +219,7 @@ function buildAndRender(nodeRows, edgeRows){
       layerName: r.layer_name ? String(r.layer_name) : null
     });
   });
-  if (nodes.length === 0) throw new Error("Nodes extraction returned empty array.");
+  if (nodes.length === 0) throw new Error("No valid rows found in nodes CSV (need id + layer columns).");
 
   nodeById = new Map(nodes.map(n => [n.id, n]));
 
@@ -264,7 +229,7 @@ function buildAndRender(nodeRows, edgeRows){
   const layerColor = layerValues.map((v,i) => COLOR_PALETTE[i % COLOR_PALETTE.length]);
   const layerLabel = layerValues.map(v => {
     const match = nodes.find(n => n.layer === v && n.layerName);
-    return match ? match.layerName : ("Tier " + v);
+    return match ? match.layerName : ("Layer " + v);
   });
   nodes.forEach(n => n.layerIndex = layerValueToIndex.get(n.layer));
 
@@ -278,7 +243,9 @@ function buildAndRender(nodeRows, edgeRows){
     links.push({source:s, target:t, type:r.type || "", kind: sLayer === tLayer ? "horizontal" : "vertical"});
   });
 
-  setStatus(`Success: Loaded ${nodes.length} nodes across ${numLayers} layers, ${links.length} structural edges.`, "ok");
+  let statusMsg = `Loaded ${nodes.length} nodes across ${numLayers} layer(s), ${links.length} edges.`;
+  if (skippedNodes || skippedEdges) statusMsg += ` (skipped ${skippedNodes} invalid node row(s), ${skippedEdges} invalid edge row(s))`;
+  setStatus(statusMsg, "ok");
 
   const legend = document.getElementById("legend");
   legend.innerHTML = "";
@@ -292,24 +259,25 @@ function buildAndRender(nodeRows, edgeRows){
   const adjacency = new Map(nodes.map(n => [n.id, new Set()]));
   links.forEach(l => { adjacency.get(l.source).add(l.target); adjacency.get(l.target).add(l.source); });
 
+  // Map both up and down directions for complete lineage tracking
   verticalChildren = new Map(nodes.map(n => [n.id, new Set()]));
-  pathAncestry = new Map(nodes.map(n => [n.id, new Set()])); 
+  verticalParents = new Map(nodes.map(n => [n.id, new Set()]));
   
   links.filter(l => l.kind === "vertical").forEach(l => {
     const a = nodeById.get(l.source), b = nodeById.get(l.target);
     const [parent, child] = a.layerIndex < b.layerIndex ? [a,b] : [b,a];
     verticalChildren.get(parent.id).add(child.id);
-    pathAncestry.get(child.id).add(parent.id);
+    verticalParents.get(child.id).add(parent.id);
   });
 
   const width = 960;
-  const height = Math.max(560, numLayers * 190);
+  const height = Math.max(400, numLayers * 190);
   layerY = {};
   layerValues.forEach((v,i) => { layerY[i] = 90 + i * ((height - 180) / Math.max(numLayers-1, 1)); });
 
   svg = d3.select("#viz").attr("viewBox", [0,0,width,height]);
   g = svg.append("g");
-  svg.call(d3.zoom().scaleExtent([0.4,2.5]).on("zoom", e => g.attr("transform", e.transform)));
+  svg.call(d3.zoom().scaleExtent([0.5,2.5]).on("zoom", e => g.attr("transform", e.transform)));
 
   linkSel = g.append("g").selectAll("path")
     .data(links).join("path")
@@ -325,33 +293,35 @@ function buildAndRender(nodeRows, edgeRows){
       .on("end", (e,d) => { if(!e.active) sim.alphaTarget(0); d.fx=null; d.fy=null; }));
 
   nodeSel.append("circle")
-    .attr("r", d => d.layerIndex===0 ? 32 : 25)
-    .attr("fill", d => layerColor[d.layerIndex] + "44")
+    .attr("r", d => d.layerIndex===0 ? 30 : 24)
+    .attr("fill", d => layerColor[d.layerIndex] + "55")
     .attr("stroke", d => layerColor[d.layerIndex]);
   nodeSel.append("text").text(d => d.label);
 
   nodeSel.on("click", (e,d) => {
     e.stopPropagation();
     if (d.layerIndex < numLayers - 1) {
-      previousIndex = d.layerIndex;
       focusIndex = d.layerIndex + 1;
       activeParentId = d.id;
+      calculateAncestry();
       render();
     }
   });
   nodeSel.on("mouseenter", (e,d) => highlight(d.id, adjacency));
   nodeSel.on("mouseleave", () => highlight(null, adjacency));
   
-  const resetUIState = () => { focusIndex = 0; previousIndex = null; activeParentId = null; render(); };
-  svg.on("click", resetUIState);
-  document.getElementById("resetView").onclick = resetUIState;
+  const resetAll = () => { focusIndex = 0; activeParentId = null; activeAncestors.clear(); render(); };
+  svg.on("click", resetAll);
+  document.getElementById("resetView").onclick = resetAll;
 
   sim = d3.forceSimulation(nodes)
-    .force("link", d3.forceLink(links).id(d => d.id).distance(d => d.kind === "vertical" ? 140 : 95).strength(0.5))
-    .force("charge", d3.forceManyBody().strength(-220))
-    .force("x", d3.forceX(width/2).strength(0.04))
-    .force("y", d3.forceY(d => layerY[d.layerIndex]).strength(1.1))
-    .force("collide", d3.forceCollide(36))
+    .force("link", d3.forceLink(links).id(d => d.id)
+      .distance(d => d.kind === "vertical" ? 150 : 90)
+      .strength(d => d.kind === "vertical" ? 0.25 : 0.7))
+    .force("charge", d3.forceManyBody().strength(-180))
+    .force("x", d3.forceX(width/2).strength(0.03))
+    .force("y", d3.forceY(d => layerY[d.layerIndex]).strength(1))
+    .force("collide", d3.forceCollide(34))
     .on("tick", () => {
       linkSel.attr("d", d => `M${d.source.x},${d.source.y} L${d.target.x},${d.target.y}`);
       nodeSel.attr("transform", d => `translate(${d.x},${d.y})`);
@@ -361,11 +331,20 @@ function buildAndRender(nodeRows, edgeRows){
   render();
 }
 
-function opacityFor(layerIndex){
-  if (layerIndex === focusIndex) return 1;
-  if (previousIndex !== null && layerIndex === previousIndex) return 0.25;
-  if (layerIndex === focusIndex + 1) return 0.25; // Peek-ahead configuration
-  return 0;
+// Recursively find every parent upstream from the active workspace item
+function calculateAncestry() {
+  activeAncestors.clear();
+  if (!activeParentId) return;
+  
+  let queue = [activeParentId];
+  while(queue.length > 0) {
+    let curr = queue.shift();
+    activeAncestors.add(curr);
+    let parents = verticalParents.get(curr);
+    if (parents) {
+      parents.forEach(p => { if(!activeAncestors.has(p)) queue.push(p); });
+    }
+  }
 }
 
 function highlight(hoverId, adjacency){
@@ -376,11 +355,7 @@ function highlight(hoverId, adjacency){
   }
   const connected = adjacency.get(hoverId);
   nodeSel.select("circle").attr("stroke-width", d => (d.id===hoverId || connected.has(d.id)) ? 3 : 1.5);
-  linkSel.style("stroke-opacity", d => {
-    const sId = d.source.id || d.source;
-    const tId = d.target.id || d.target;
-    return (sId === hoverId || tId === hoverId) ? 1 : 0.15;
-  });
+  linkSel.style("stroke-opacity", d => (d.source.id===hoverId || d.target.id===hoverId || d.source===hoverId || d.target===hoverId) ? 1 : 0.15);
 }
 
 function render(){
@@ -388,32 +363,25 @@ function render(){
 
   nodeSel.transition().duration(400)
     .style("opacity", d => {
-      let opacity = opacityFor(d.layerIndex);
-      if (opacity > 0) {
-        if (d.layerIndex === focusIndex && activeChildren) {
-          opacity = activeChildren.has(d.id) ? 1 : 0;
-        }
-        if (previousIndex !== null && d.layerIndex === previousIndex && activeParentId) {
-          opacity = (d.id === activeParentId) ? 0.25 : 0;
-        }
-        if (d.layerIndex === focusIndex + 1 && activeParentId) {
-          const connectedToCurrentFocus = verticalChildren.get(activeParentId);
-          let belongsToTree = false;
-          pathAncestry.get(d.id).forEach(pId => {
-            if (pId === activeParentId || (connectedToCurrentFocus && connectedToCurrentFocus.has(pId))) {
-              belongsToTree = true;
-            }
-          });
-          opacity = belongsToTree ? 0.25 : 0;
-        }
+      // 1. Current deep active focus layer gets 1.0 opacity
+      if (d.layerIndex === focusIndex) {
+        if (activeChildren) return activeChildren.has(d.id) ? 1.0 : 0.0;
+        return 1.0;
       }
-      return opacity;
+      // 2. Any tier above our focus layer checks if it's on the specific path we clicked down through
+      if (d.layerIndex < focusIndex) {
+        return activeAncestors.has(d.id) ? 0.25 : 0.0;
+      }
+      // 3. Peek-ahead logic: show next immediate tier dimmed if we are at the top level
+      if (focusIndex === 0 && d.layerIndex === 1) return 0.25;
+      
+      return 0.0;
     })
     .style("pointer-events", d => {
-      let opacity = opacityFor(d.layerIndex);
-      if (d.layerIndex === focusIndex && activeChildren && !activeChildren.has(d.id)) opacity = 0;
-      if (previousIndex !== null && d.layerIndex === previousIndex && activeParentId && d.id !== activeParentId) opacity = 0;
-      return opacity === 0 ? "none" : "auto";
+      if (d.layerIndex === focusIndex && activeChildren && !activeChildren.has(d.id)) return "none";
+      if (d.layerIndex < focusIndex && !activeAncestors.has(d.id)) return "none";
+      if (focusIndex === 0 && d.layerIndex === 1) return "auto";
+      return d.layerIndex === focusIndex ? "auto" : "none";
     });
 
   linkSel.transition().duration(400)
@@ -421,15 +389,11 @@ function render(){
       const sNode = nodeById.get(d.source.id || d.source);
       const tNode = nodeById.get(d.target.id || d.target);
       
-      let sOpacity = opacityFor(sNode.layerIndex);
-      let tOpacity = opacityFor(tNode.layerIndex);
+      // Keep structural links visible if both endpoints are active/visible on screen
+      const sVisible = (sNode.layerIndex === focusIndex && (!activeChildren || activeChildren.has(sNode.id))) || activeAncestors.has(sNode.id) || (focusIndex === 0 && sNode.layerIndex === 1);
+      const tVisible = (tNode.layerIndex === focusIndex && (!activeChildren || activeChildren.has(tNode.id))) || activeAncestors.has(tNode.id) || (focusIndex === 0 && tNode.layerIndex === 1);
       
-      if (sNode.layerIndex === focusIndex && activeChildren && !activeChildren.has(sNode.id)) sOpacity = 0;
-      if (tNode.layerIndex === focusIndex && activeChildren && !activeChildren.has(tNode.id)) tOpacity = 0;
-      if (previousIndex !== null && sNode.layerIndex === previousIndex && activeParentId && sNode.id !== activeParentId) sOpacity = 0;
-      if (previousIndex !== null && tNode.layerIndex === previousIndex && activeParentId && tNode.id !== activeParentId) tOpacity = 0;
-
-      return Math.min(sOpacity, tOpacity) > 0 ? 1 : 0;
+      return (sVisible && tVisible) ? 1.0 : 0.0;
     });
 
   renderBreadcrumb();
@@ -439,29 +403,29 @@ function renderBreadcrumb(){
   const bc = document.getElementById("breadcrumb");
   bc.innerHTML = "";
   const labels = window.__layerLabel || [];
-  
   for (let i = 0; i <= focusIndex; i++){
     const span = document.createElement("span");
-    span.textContent = labels[i] || ("Tier " + i);
+    span.textContent = labels[i] || ("Layer " + i);
     span.onclick = () => {
       focusIndex = i;
-      previousIndex = i > 0 ? i - 1 : null;
-      if (i === 0) activeParentId = null;
-      if (activeParentId && nodeById.get(activeParentId).layerIndex >= focusIndex) {
-        let currentLook = activeParentId;
-        while (currentLook && nodeById.get(currentLook).layerIndex !== previousIndex) {
-          const ancestors = pathAncestry.get(currentLook);
-          currentLook = ancestors && ancestors.size > 0 ? Array.from(ancestors)[0] : null;
-        }
-        activeParentId = currentLook;
+      if (i === 0) {
+        activeParentId = null;
+      } else {
+        // Find the ancestor node belonging to the tier we are tracking back to
+        let targetId = null;
+        activeAncestors.forEach(id => {
+          if (nodeById.get(id).layerIndex === i - 1) targetId = id;
+        });
+        activeParentId = targetId;
       }
+      calculateAncestry();
       render();
     };
     bc.appendChild(span);
     if (i < focusIndex){
       const sep = document.createElement("span");
       sep.className = "sep";
-      sep.textContent = "›";
+      sep.textContent = " › ";
       bc.appendChild(sep);
     }
   }
