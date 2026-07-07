@@ -81,7 +81,7 @@
 
   <div class="hint">
     <strong>How layers work:</strong> the <code>layer</code> column is an integer depth (1, 2, 3...). Rows connecting nodes on the <em>same</em> layer are drawn horizontally (dashed); rows connecting <em>different</em> layers are drawn vertically — this is detected automatically, you don't need a "kind" column.<br>
-    Click a node to drill into the next layer down (only the layer you're on stays fully solid; the layers before it fade into an ancestor trail; everything else stays hidden). Click the breadcrumb or "Reset view" to zoom back out.
+    Click a node to drill into the next layer down. The layer you are currently investigating stays fully solid, while its precise upstream structural pedigree remains cleanly faded into view.
   </div>
 </div>
 
@@ -122,22 +122,10 @@ w_agua,lang_spanish,BELONGS_TO
 w_acqua,lang_italian,BELONGS_TO
 w_agua_pt,lang_portuguese,BELONGS_TO
 w_terra,lang_latin,BELONGS_TO
-w_terre,text,BELONGS_TO
-w_terre,french,BELONGS_TO
-w_tierra,spanish,BELONGS_TO
-w_terre,french,BELONGS_TO
 w_terre,lang_french,BELONGS_TO
 w_tierra,lang_spanish,BELONGS_TO
 w_terra_it,lang_italian,BELONGS_TO
 w_terra_pt,lang_portuguese,BELONGS_TO
-w_eau,w_aqua,DERIVED_FROM
-w_agua,w_aqua,DERIVED_FROM
-w_acqua,w_aqua,DERIVED_FROM
-w_agua_pt,w_aqua,DERIVED_FROM
-w_terre,w_terra,DERIVED_FROM
-w_tierra,w_terra,DERIVED_FROM
-w_terra_it,w_terra,DERIVED_FROM
-w_terra_pt,w_terra,DERIVED_FROM
 w_aqua,d_water,HAS_MEANING
 w_eau,d_water,HAS_MEANING
 w_agua,d_water,HAS_MEANING
@@ -259,7 +247,7 @@ function buildAndRender(nodeRows, edgeRows){
   const adjacency = new Map(nodes.map(n => [n.id, new Set()]));
   links.forEach(l => { adjacency.get(l.source).add(l.target); adjacency.get(l.target).add(l.source); });
 
-  // Map both up and down directions for complete lineage tracking
+  // Deep schema-agnostic relational indexing
   verticalChildren = new Map(nodes.map(n => [n.id, new Set()]));
   verticalParents = new Map(nodes.map(n => [n.id, new Set()]));
   
@@ -331,7 +319,7 @@ function buildAndRender(nodeRows, edgeRows){
   render();
 }
 
-// Recursively find every parent upstream from the active workspace item
+// Trace all structural dependencies backwards up the tree layout
 function calculateAncestry() {
   activeAncestors.clear();
   if (!activeParentId) return;
@@ -363,16 +351,16 @@ function render(){
 
   nodeSel.transition().duration(400)
     .style("opacity", d => {
-      // 1. Current deep active focus layer gets 1.0 opacity
+      // 1. Current active focus workspace tier stays 1.0 visible
       if (d.layerIndex === focusIndex) {
         if (activeChildren) return activeChildren.has(d.id) ? 1.0 : 0.0;
         return 1.0;
       }
-      // 2. Any tier above our focus layer checks if it's on the specific path we clicked down through
+      // 2. Structural path tracing up the graph tree remains cleanly visible at 0.25 opacity
       if (d.layerIndex < focusIndex) {
         return activeAncestors.has(d.id) ? 0.25 : 0.0;
       }
-      // 3. Peek-ahead logic: show next immediate tier dimmed if we are at the top level
+      // 3. Top level preview helper
       if (focusIndex === 0 && d.layerIndex === 1) return 0.25;
       
       return 0.0;
@@ -389,7 +377,6 @@ function render(){
       const sNode = nodeById.get(d.source.id || d.source);
       const tNode = nodeById.get(d.target.id || d.target);
       
-      // Keep structural links visible if both endpoints are active/visible on screen
       const sVisible = (sNode.layerIndex === focusIndex && (!activeChildren || activeChildren.has(sNode.id))) || activeAncestors.has(sNode.id) || (focusIndex === 0 && sNode.layerIndex === 1);
       const tVisible = (tNode.layerIndex === focusIndex && (!activeChildren || activeChildren.has(tNode.id))) || activeAncestors.has(tNode.id) || (focusIndex === 0 && tNode.layerIndex === 1);
       
@@ -411,7 +398,6 @@ function renderBreadcrumb(){
       if (i === 0) {
         activeParentId = null;
       } else {
-        // Find the ancestor node belonging to the tier we are tracking back to
         let targetId = null;
         activeAncestors.forEach(id => {
           if (nodeById.get(id).layerIndex === i - 1) targetId = id;
