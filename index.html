@@ -20,20 +20,52 @@
   #app{max-width:960px; margin:0 auto; padding:20px;}
   header{margin-bottom:8px;}
   h1{font-size:16px; font-weight:600; margin:0 0 4px;}
-  #breadcrumb{font-size:13px; color:var(--muted); margin-bottom:14px; min-height:18px;}
-  #breadcrumb span{cursor:pointer; color:var(--text);}
-  #breadcrumb span:hover{text-decoration:underline;}
-  #breadcrumb .sep{color:var(--muted); margin:0 6px; cursor:default;}
-  #breadcrumb .sep:hover{text-decoration:none;}
+  
+  /* FIXED BREADCRUMB STYLING */
+  #breadcrumb {
+    font-size: 14px; 
+    color: var(--muted); 
+    margin-bottom: 14px; 
+    min-height: 24px;
+    background: var(--panel);
+    padding: 8px 16px;
+    border-radius: 6px;
+    border: 1px solid var(--line);
+    display: inline-block;
+  }
+  #breadcrumb span { 
+    cursor: pointer; 
+    color: var(--teal); 
+    font-weight: 600;
+  }
+  #breadcrumb span:hover { 
+    text-decoration: underline; 
+  }
+  #breadcrumb .sep { 
+    color: var(--muted); 
+    margin: 0 8px; 
+    cursor: default; 
+  }
+  #breadcrumb .sep:hover { 
+    text-decoration: none; 
+  }
+
   #canvas-wrap{
     background:var(--panel); border:1px solid var(--line); border-radius:12px;
     overflow:hidden;
   }
   svg{display:block; width:100%; cursor:grab;}
   .node circle{stroke-width:1.5px; cursor:pointer;}
+  
+  /* CRUNCHY WHITE TEXT FOR EASY READING */
   .node text{
-    font-size:11px; font-weight:500; fill:var(--text); pointer-events:none;
-    text-anchor:middle; dominant-baseline:central;
+    font-size: 12px; 
+    font-weight: 600; 
+    fill: #ffffff; 
+    text-shadow: 0 1px 3px rgba(0,0,0,0.8); 
+    pointer-events: none;
+    text-anchor: middle; 
+    dominant-baseline: central;
   }
   .layer-language circle{fill:var(--purple-dim); stroke:var(--purple);}
   .layer-word circle{fill:var(--teal-dim); stroke:var(--teal);}
@@ -61,26 +93,6 @@
 </div>
 
 <script>
-/* ============================================================
-   MOCK DATA — structured exactly like a Neo4j query result:
-   nodes have {id, label, layer}, relationships have {source, target, type}.
-   In production, replace buildGraph() below with a fetch to your
-   backend, which runs Cypher like:
-
-   MATCH (l:Language)-[:DEVELOPED_INTO]->(l2:Language)
-   RETURN l, l2
-
-   MATCH (l:Language)<-[:BELONGS_TO]-(w:Word)
-   OPTIONAL MATCH (w)-[:DERIVED_FROM]->(w2:Word)
-   RETURN l, w, w2
-
-   MATCH (w:Word)-[:HAS_MEANING]->(d:Definition)
-   OPTIONAL MATCH (d)-[:SYNONYM_OF]->(d2:Definition)
-   RETURN w, d, d2
-
-   ...and reshapes the driver's records into the same
-   {nodes, links} shape produced by buildGraph().
-   ============================================================ */
 function buildGraph(){
   const nodes = [
     // Layer 1 — languages
@@ -108,13 +120,12 @@ function buildGraph(){
   ];
 
   const links = [
-    // Layer 1 horizontal — DEVELOPED_INTO
+    // Layer 1 horizontal
     {source:"latin", target:"french", type:"DEVELOPED_INTO", kind:"horizontal"},
     {source:"latin", target:"spanish", type:"DEVELOPED_INTO", kind:"horizontal"},
     {source:"latin", target:"italian", type:"DEVELOPED_INTO", kind:"horizontal"},
     {source:"latin", target:"portuguese", type:"DEVELOPED_INTO", kind:"horizontal"},
-
-    // Layer 1 -> 2 vertical — BELONGS_TO
+    // Layer 1 -> 2 vertical
     {source:"w_aqua", target:"latin", type:"BELONGS_TO", kind:"vertical"},
     {source:"w_eau", target:"french", type:"BELONGS_TO", kind:"vertical"},
     {source:"w_agua", target:"spanish", type:"BELONGS_TO", kind:"vertical"},
@@ -125,8 +136,7 @@ function buildGraph(){
     {source:"w_tierra", target:"spanish", type:"BELONGS_TO", kind:"vertical"},
     {source:"w_terra_it", target:"italian", type:"BELONGS_TO", kind:"vertical"},
     {source:"w_terra_pt", target:"portuguese", type:"BELONGS_TO", kind:"vertical"},
-
-    // Layer 2 horizontal — DERIVED_FROM (cognates)
+    // Layer 2 horizontal
     {source:"w_eau", target:"w_aqua", type:"DERIVED_FROM", kind:"horizontal"},
     {source:"w_agua", target:"w_aqua", type:"DERIVED_FROM", kind:"horizontal"},
     {source:"w_acqua", target:"w_aqua", type:"DERIVED_FROM", kind:"horizontal"},
@@ -135,8 +145,7 @@ function buildGraph(){
     {source:"w_tierra", target:"w_terra", type:"DERIVED_FROM", kind:"horizontal"},
     {source:"w_terra_it", target:"w_terra", type:"DERIVED_FROM", kind:"horizontal"},
     {source:"w_terra_pt", target:"w_terra", type:"DERIVED_FROM", kind:"horizontal"},
-
-    // Layer 2 -> 3 vertical — HAS_MEANING
+    // Layer 2 -> 3 vertical
     {source:"w_aqua", target:"d_water", type:"HAS_MEANING", kind:"vertical"},
     {source:"w_eau", target:"d_water", type:"HAS_MEANING", kind:"vertical"},
     {source:"w_agua", target:"d_water", type:"HAS_MEANING", kind:"vertical"},
@@ -149,8 +158,7 @@ function buildGraph(){
     {source:"w_terra_it", target:"d_land", type:"HAS_MEANING", kind:"vertical"},
     {source:"w_terra_it", target:"d_territory", type:"HAS_MEANING", kind:"vertical"},
     {source:"w_terra_pt", target:"d_land", type:"HAS_MEANING", kind:"vertical"},
-
-    // Layer 3 horizontal — SYNONYM_OF
+    // Layer 3 horizontal
     {source:"d_baptism", target:"d_water", type:"SYNONYM_OF", kind:"horizontal"},
     {source:"d_territory", target:"d_land", type:"SYNONYM_OF", kind:"horizontal"},
   ];
@@ -158,13 +166,9 @@ function buildGraph(){
   return {nodes, links};
 }
 
-/* ============================================================
-   RENDER + STATE LOGIC
-   ============================================================ */
 const {nodes, links} = buildGraph();
 const nodeById = new Map(nodes.map(n => [n.id, n]));
 
-// adjacency map for hover-highlighting (works across all links, any layer)
 const adjacency = new Map(nodes.map(n => [n.id, new Set()]));
 links.forEach(l => {
   adjacency.get(l.source).add(l.target);
@@ -173,7 +177,6 @@ links.forEach(l => {
 
 const width = 920, height = 560;
 const layerY = {1: 90, 2: 290, 3: 490};
-const layerNames = {1:"Languages", 2:"Words", 3:"Definitions"};
 const layerClass = {1:"layer-language", 2:"layer-word", 3:"layer-definition"};
 
 const svg = d3.select("#viz").attr("viewBox", [0,0,width,height]);
@@ -194,16 +197,22 @@ const nodeSel = g.append("g").selectAll("g")
   .attr("class", d => "node " + layerClass[d.layer])
   .call(d3.drag()
     .on("start", (e,d) => { if(!e.active) sim.alphaTarget(0.2).restart(); d.fx=d.x; d.fy=d.y; })
-    .on("drag", (e,d) => { d.fx=e.x; d.fy=d.y; })
+    .on("drag", (e,d) => { d.fx=e.x; d.fy=e.y; })
     .on("end", (e,d) => { if(!e.active) sim.alphaTarget(0); d.fx=null; d.fy=null; }));
 
-nodeSel.append("circle").attr("r", d => d.layer===1?30:26);
+nodeSel.append("circle").attr("r", d => d.layer===1?35:28);
 nodeSel.append("text").text(d => d.label);
+
+// TRACKING STATE FOR BIDIRECTIONAL FILTERS
+let focus = {level:1, selectedLanguage:null, selectedWord:null};
 
 nodeSel.on("click", (e,d) => {
   e.stopPropagation();
-  if (d.layer === 1) { focus = {level:2, selectedLanguage:d.id, selectedWord:null}; }
-  else if (d.layer === 2) { focus = {level:3, selectedLanguage:d.lang, selectedWord:d.id}; }
+  if (d.layer === 1) { 
+    focus = {level:2, selectedLanguage:d.id, selectedWord:null}; 
+  } else if (d.layer === 2) { 
+    focus = {level:3, selectedLanguage:d.lang, selectedWord:d.id}; 
+  }
   render();
 });
 
@@ -214,12 +223,12 @@ svg.on("click", () => { focus = {level:1, selectedLanguage:null, selectedWord:nu
 
 const sim = d3.forceSimulation(nodes)
   .force("link", d3.forceLink(links).id(d => d.id)
-    .distance(d => d.kind === "vertical" ? 160 : 90)
+    .distance(d => d.kind === "vertical" ? 160 : 100)
     .strength(d => d.kind === "vertical" ? 0.25 : 0.7))
-  .force("charge", d3.forceManyBody().strength(-180))
-  .force("x", d3.forceX(width/2).strength(0.03))
-  .force("y", d3.forceY(d => layerY[d.layer]).strength(1))
-  .force("collide", d3.forceCollide(38))
+  .force("charge", d3.forceManyBody().strength(-200))
+  .force("x", d3.forceX(width/2).strength(0.04))
+  .force("y", d3.forceY(d => layerY[d.layer]).strength(1.2))
+  .force("collide", d3.forceCollide(42))
   .on("tick", ticked);
 
 function ticked(){
@@ -227,14 +236,31 @@ function ticked(){
   nodeSel.attr("transform", d => `translate(${d.x},${d.y})`);
 }
 
-// ---- focus state drives opacity per the A/B/C rule from the design spec ----
-let focus = {level:1, selectedLanguage:null, selectedWord:null};
-
-function opacityFor(layer){
+// FIXED LOGIC FOR SLIDING VIEWPORT DIMS & ISOLATIONS
+function opacityFor(layer, d = null){
   const f = focus.level;
-  if (layer === f) return 1;
-  if (layer === f - 1) return 0.25;      // layer you came from: breadcrumb fade
-  if (layer === f + 1 && f === 1) return 0.25; // peek-ahead only at the very top
+  
+  if (f === 1) {
+    if (layer === 1) return 1;
+    if (layer === 2) return 0.25; 
+    return 0;
+  }
+  
+  if (f === 2) {
+    if (layer === 1) return d && d.id === focus.selectedLanguage ? 1 : 0.15;
+    if (layer === 2) return d && d.lang === focus.selectedLanguage ? 1 : 0;
+    return 0;
+  }
+  
+  if (f === 3) {
+    if (layer === 1) return d && d.id === focus.selectedLanguage ? 0.25 : 0; // Context lock!
+    if (layer === 2) return d && d.id === focus.selectedWord ? 1 : 0.15;
+    if (layer === 3) {
+      const connected = adjacency.get(focus.selectedWord);
+      return d && connected.has(d.id) ? 1 : 0;
+    }
+    return 0;
+  }
   return 0;
 }
 
@@ -254,21 +280,22 @@ function highlight(hoverId){
 
 function render(){
   nodeSel.transition().duration(400)
-    .style("opacity", d => {
-      if (focus.level >= 2 && d.layer === 2 && focus.selectedLanguage) {
-        // dim words that don't belong to the selected language, once we've drilled in
-        return d.lang === focus.selectedLanguage ? opacityFor(2) : opacityFor(2) * 0.4;
-      }
-      return opacityFor(d.layer);
-    })
-    .style("pointer-events", d => opacityFor(d.layer) === 0 ? "none" : "auto");
+    .style("opacity", d => opacityFor(d.layer, d))
+    .style("pointer-events", d => opacityFor(d.layer, d) === 0 ? "none" : "auto");
 
   linkSel.transition().duration(400)
     .style("opacity", d => {
-      const sLayer = nodeById.get(d.source.id ?? d.source).layer;
-      const tLayer = nodeById.get(d.target.id ?? d.target).layer;
-      const minOp = Math.min(opacityFor(sLayer), opacityFor(tLayer));
-      return minOp;
+      const sNode = nodeById.get(d.source.id ?? d.source);
+      const tNode = nodeById.get(d.target.id ?? d.target);
+      const sOp = opacityFor(sNode.layer, sNode);
+      const tOp = opacityFor(tNode.layer, tNode);
+      
+      if (sOp === 0 || tOp === 0) return 0;
+      if (focus.level === 3 && d.kind === "vertical") {
+        if (sNode.layer === 2 && sNode.id !== focus.selectedWord) return 0;
+        if (tNode.layer === 2 && tNode.id !== focus.selectedWord) return 0;
+      }
+      return Math.min(sOp, tOp);
     });
 
   renderBreadcrumb();
