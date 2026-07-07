@@ -44,7 +44,6 @@
   .node circle{stroke-width:1.5px; cursor:pointer;}
   .node text{font-size:11px; font-weight:500; fill:var(--text); pointer-events:none; text-anchor:middle; dominant-baseline:central;}
   .edge{stroke-width:1.2px; fill:none;}
-  .edge.horizontal{stroke-dasharray:3,3;}
   .hint{font-size:12px; color:var(--muted); margin-top:10px; line-height:1.6;}
   code{background:#242832; padding:1px 5px; border-radius:4px; font-size:11px;}
   #empty-state{padding:60px 20px; text-align:center; color:var(--muted); font-size:13px;}
@@ -80,8 +79,7 @@
   </div>
 
   <div class="hint">
-    <strong>How layers work:</strong> the <code>layer</code> column is an integer depth (1, 2, 3...). Rows connecting nodes on the <em>same</em> layer are drawn horizontally (dashed); rows connecting <em>different</em> layers are drawn vertically — this is detected automatically, you don't need a "kind" column.<br>
-    Click a node to drill into the next layer down. The layer you are currently investigating stays fully solid, while its precise upstream structural pedigree remains cleanly faded into view.
+    <strong>How layers work:</strong> Only hierarchical cross-layer edges are processed. Click a node to focus downward; your exact lineage history track remains cleanly faded into view at the top.
   </div>
 </div>
 
@@ -110,6 +108,7 @@ d_baptism,ritual purification,3,Definitions
 d_land,solid ground / earth,3,Definitions
 d_territory,region under control,3,Definitions`;
 
+// Completely removed lateral cross-references (SYNONYM_OF, DERIVED_FROM)
 const SAMPLE_EDGES_CSV =
 `source,target,type
 lang_latin,lang_french,DEVELOPED_INTO
@@ -137,9 +136,7 @@ w_terre,d_land,HAS_MEANING
 w_tierra,d_land,HAS_MEANING
 w_terra_it,d_land,HAS_MEANING
 w_terra_it,d_territory,HAS_MEANING
-w_terra_pt,d_land,HAS_MEANING
-d_baptism,d_water,SYNONYM_OF
-d_territory,d_land,SYNONYM_OF`;
+w_terra_pt,d_land,HAS_MEANING`;
 
 let rawNodeRows = null, rawEdgeRows = null;
 
@@ -207,7 +204,7 @@ function buildAndRender(nodeRows, edgeRows){
       layerName: r.layer_name ? String(r.layer_name) : null
     });
   });
-  if (nodes.length === 0) throw new Error("No valid rows found in nodes CSV (need id + layer columns).");
+  if (nodes.length === 0) throw new Error("No valid rows found in nodes CSV.");
 
   nodeById = new Map(nodes.map(n => [n.id, n]));
 
@@ -221,19 +218,28 @@ function buildAndRender(nodeRows, edgeRows){
   });
   nodes.forEach(n => n.layerIndex = layerValueToIndex.get(n.layer));
 
+  // Build structural strict vertical trees
+  verticalChildren = new Map(nodes.map(n => [n.id, new Set()]));
+  verticalParents = new Map(nodes.map(n => [n.id, new Set()]));
   const links = [];
   let skippedEdges = 0;
+
   edgeRows.forEach(r => {
     const s = r.source !== undefined ? String(r.source) : "";
     const t = r.target !== undefined ? String(r.target) : "";
     if (!s || !t || !nodeById.has(s) || !nodeById.has(t)) { skippedEdges++; return; }
-    const sLayer = nodeById.get(s).layerIndex, tLayer = nodeById.get(t).layerIndex;
-    links.push({source:s, target:t, type:r.type || "", kind: sLayer === tLayer ? "horizontal" : "vertical"});
+    
+    const sNode = nodeById.get(s), tNode = nodeById.get(t);
+    // Ignore any connections inside the exact same layer index
+    if (sNode.layerIndex === tNode.layerIndex) return;
+
+    links.push({source:s, target:t, type:r.type || ""});
+    const [parent, child] = sNode.layerIndex < tNode.layerIndex ? [sNode, tNode] : [tNode, sNode];
+    verticalChildren.get(parent.id).add(child.id);
+    verticalParents.get(child.id).add(parent.id);
   });
 
-  let statusMsg = `Loaded ${nodes.length} nodes across ${numLayers} layer(s), ${links.length} edges.`;
-  if (skippedNodes || skippedEdges) statusMsg += ` (skipped ${skippedNodes} invalid node row(s), ${skippedEdges} invalid edge row(s))`;
-  setStatus(statusMsg, "ok");
+  setStatus(`Loaded ${nodes.length} nodes across ${numLayers} layers, ${links.length} vertical relationships mapped.`, "ok");
 
   const legend = document.getElementById("legend");
   legend.innerHTML = "";
@@ -247,17 +253,6 @@ function buildAndRender(nodeRows, edgeRows){
   const adjacency = new Map(nodes.map(n => [n.id, new Set()]));
   links.forEach(l => { adjacency.get(l.source).add(l.target); adjacency.get(l.target).add(l.source); });
 
-  // Deep schema-agnostic relational indexing
-  verticalChildren = new Map(nodes.map(n => [n.id, new Set()]));
-  verticalParents = new Map(nodes.map(n => [n.id, new Set()]));
-  
-  links.filter(l => l.kind === "vertical").forEach(l => {
-    const a = nodeById.get(l.source), b = nodeById.get(l.target);
-    const [parent, child] = a.layerIndex < b.layerIndex ? [a,b] : [b,a];
-    verticalChildren.get(parent.id).add(child.id);
-    verticalParents.get(child.id).add(parent.id);
-  });
-
   const width = 960;
   const height = Math.max(400, numLayers * 190);
   layerY = {};
@@ -269,7 +264,7 @@ function buildAndRender(nodeRows, edgeRows){
 
   linkSel = g.append("g").selectAll("path")
     .data(links).join("path")
-    .attr("class", d => "edge " + d.kind)
+    .attr("class", "edge")
     .attr("stroke", d => layerColor[nodeById.get(d.source).layerIndex] || "#666");
 
   nodeSel = g.append("g").selectAll("g")
@@ -303,12 +298,10 @@ function buildAndRender(nodeRows, edgeRows){
   document.getElementById("resetView").onclick = resetAll;
 
   sim = d3.forceSimulation(nodes)
-    .force("link", d3.forceLink(links).id(d => d.id)
-      .distance(d => d.kind === "vertical" ? 150 : 90)
-      .strength(d => d.kind === "vertical" ? 0.25 : 0.7))
-    .force("charge", d3.forceManyBody().strength(-180))
+    .force("link", d3.forceLink(links).id(d => d.id).distance(140).strength(0.4))
+    .force("charge", d3.forceManyBody().strength(-150))
     .force("x", d3.forceX(width/2).strength(0.03))
-    .force("y", d3.forceY(d => layerY[d.layerIndex]).strength(1))
+    .force("y", d3.forceY(d => layerY[d.layerIndex]).strength(1.1))
     .force("collide", d3.forceCollide(34))
     .on("tick", () => {
       linkSel.attr("d", d => `M${d.source.x},${d.source.y} L${d.target.x},${d.target.y}`);
@@ -319,7 +312,6 @@ function buildAndRender(nodeRows, edgeRows){
   render();
 }
 
-// Trace all structural dependencies backwards up the tree layout
 function calculateAncestry() {
   activeAncestors.clear();
   if (!activeParentId) return;
@@ -351,18 +343,14 @@ function render(){
 
   nodeSel.transition().duration(400)
     .style("opacity", d => {
-      // 1. Current active focus workspace tier stays 1.0 visible
       if (d.layerIndex === focusIndex) {
         if (activeChildren) return activeChildren.has(d.id) ? 1.0 : 0.0;
         return 1.0;
       }
-      // 2. Structural path tracing up the graph tree remains cleanly visible at 0.25 opacity
       if (d.layerIndex < focusIndex) {
         return activeAncestors.has(d.id) ? 0.25 : 0.0;
       }
-      // 3. Top level preview helper
       if (focusIndex === 0 && d.layerIndex === 1) return 0.25;
-      
       return 0.0;
     })
     .style("pointer-events", d => {
