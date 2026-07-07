@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Etymology graph — semantic zoom prototype</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<style>
+  :root{
+    --bg:#12141a; --panel:#1a1d25; --line:#2a2e38;
+    --text:#e8e8ea; --muted:#8a8d98;
+    --purple:#8b7fe8; --purple-dim:#8b7fe855;
+    --teal:#3fc9a0; --teal-dim:#3fc9a055;
+    --coral:#e88a6a; --coral-dim:#e88a6a55;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  }
+  #app{max-width:960px; margin:0 auto; padding:20px;}
+  header{margin-bottom:8px;}
+  h1{font-size:16px; font-weight:600; margin:0 0 4px;}
+  #breadcrumb{font-size:13px; color:var(--muted); margin-bottom:14px; min-height:18px;}
+  #breadcrumb span{cursor:pointer; color:var(--text);}
+  #breadcrumb span:hover{text-decoration:underline;}
+  #breadcrumb .sep{color:var(--muted); margin:0 6px; cursor:default;}
+  #breadcrumb .sep:hover{text-decoration:none;}
+  #canvas-wrap{
+    background:var(--panel); border:1px solid var(--line); border-radius:12px;
+    overflow:hidden;
+  }
+  svg{display:block; width:100%; cursor:grab;}
+  .node circle{stroke-width:1.5px; cursor:pointer;}
+  .node text{
+    font-size:11px; font-weight:500; fill:var(--text); pointer-events:none;
+    text-anchor:middle; dominant-baseline:central;
+  }
+  .layer-language circle{fill:var(--purple-dim); stroke:var(--purple);}
+  .layer-word circle{fill:var(--teal-dim); stroke:var(--teal);}
+  .layer-definition circle{fill:var(--coral-dim); stroke:var(--coral);}
+  .edge{stroke-width:1.2px; fill:none;}
+  .edge.horizontal{stroke-dasharray:3,3;}
+  .edge.vertical{stroke-dasharray:none;}
+  .hint{font-size:12px; color:var(--muted); margin-top:10px; line-height:1.5;}
+  #reset{
+    font-size:12px; color:var(--muted); background:none; border:1px solid var(--line);
+    border-radius:6px; padding:4px 10px; cursor:pointer; float:right;
+  }
+  #reset:hover{color:var(--text); border-color:var(--muted);}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <button id="reset">Reset view</button>
+    <h1>Etymology graph</h1>
+    <div id="breadcrumb"></div>
+  </header>
+  <div id="canvas-wrap"><svg id="viz"></svg></div>
+  <div class="hint">Click a language to reveal its words. Click a word to reveal its definitions. Hover any node to trace its connections. Use the breadcrumb or Reset to zoom back out.</div>
+</div>
+
+<script>
+/* ============================================================
+   MOCK DATA — structured exactly like a Neo4j query result:
+   nodes have {id, label, layer}, relationships have {source, target, type}.
+   In production, replace buildGraph() below with a fetch to your
+   backend, which runs Cypher like:
+
+   MATCH (l:Language)-[:DEVELOPED_INTO]->(l2:Language)
+   RETURN l, l2
+
+   MATCH (l:Language)<-[:BELONGS_TO]-(w:Word)
+   OPTIONAL MATCH (w)-[:DERIVED_FROM]->(w2:Word)
+   RETURN l, w, w2
+
+   MATCH (w:Word)-[:HAS_MEANING]->(d:Definition)
+   OPTIONAL MATCH (d)-[:SYNONYM_OF]->(d2:Definition)
+   RETURN w, d, d2
+
+   ...and reshapes the driver's records into the same
+   {nodes, links} shape produced by buildGraph().
+   ============================================================ */
+function buildGraph(){
+  const nodes = [
+    // Layer 1 — languages
+    {id:"latin", label:"Latin", layer:1},
+    {id:"french", label:"French", layer:1},
+    {id:"spanish", label:"Spanish", layer:1},
+    {id:"italian", label:"Italian", layer:1},
+    {id:"portuguese", label:"Portuguese", layer:1},
+    // Layer 2 — words
+    {id:"w_aqua", label:"aqua", layer:2, lang:"latin"},
+    {id:"w_eau", label:"eau", layer:2, lang:"french"},
+    {id:"w_agua", label:"agua", layer:2, lang:"spanish"},
+    {id:"w_acqua", label:"acqua", layer:2, lang:"italian"},
+    {id:"w_agua_pt", label:"água", layer:2, lang:"portuguese"},
+    {id:"w_terra", label:"terra", layer:2, lang:"latin"},
+    {id:"w_terre", label:"terre", layer:2, lang:"french"},
+    {id:"w_tierra", label:"tierra", layer:2, lang:"spanish"},
+    {id:"w_terra_it", label:"terra", layer:2, lang:"italian"},
+    {id:"w_terra_pt", label:"terra", layer:2, lang:"portuguese"},
+    // Layer 3 — definitions
+    {id:"d_water", label:"clear liquid, H2O", layer:3},
+    {id:"d_baptism", label:"ritual purification", layer:3},
+    {id:"d_land", label:"solid ground / earth", layer:3},
+    {id:"d_territory", label:"region under control", layer:3},
+  ];
+
+  const links = [
+    // Layer 1 horizontal — DEVELOPED_INTO
+    {source:"latin", target:"french", type:"DEVELOPED_INTO", kind:"horizontal"},
+    {source:"latin", target:"spanish", type:"DEVELOPED_INTO", kind:"horizontal"},
+    {source:"latin", target:"italian", type:"DEVELOPED_INTO", kind:"horizontal"},
+    {source:"latin", target:"portuguese", type:"DEVELOPED_INTO", kind:"horizontal"},
+
+    // Layer 1 -> 2 vertical — BELONGS_TO
+    {source:"w_aqua", target:"latin", type:"BELONGS_TO", kind:"vertical"},
+    {source:"w_eau", target:"french", type:"BELONGS_TO", kind:"vertical"},
+    {source:"w_agua", target:"spanish", type:"BELONGS_TO", kind:"vertical"},
+    {source:"w_acqua", target:"italian", type:"BELONGS_TO", kind:"vertical"},
+    {source:"w_agua_pt", target:"portuguese", type:"BELONGS_TO", kind:"vertical"},
+    {source:"w_terra", target:"latin", type:"BELONGS_TO", kind:"vertical"},
+    {source:"w_terre", target:"french", type:"BELONGS_TO", kind:"vertical"},
+    {source:"w_tierra", target:"spanish", type:"BELONGS_TO", kind:"vertical"},
+    {source:"w_terra_it", target:"italian", type:"BELONGS_TO", kind:"vertical"},
+    {source:"w_terra_pt", target:"portuguese", type:"BELONGS_TO", kind:"vertical"},
+
+    // Layer 2 horizontal — DERIVED_FROM (cognates)
+    {source:"w_eau", target:"w_aqua", type:"DERIVED_FROM", kind:"horizontal"},
+    {source:"w_agua", target:"w_aqua", type:"DERIVED_FROM", kind:"horizontal"},
+    {source:"w_acqua", target:"w_aqua", type:"DERIVED_FROM", kind:"horizontal"},
+    {source:"w_agua_pt", target:"w_aqua", type:"DERIVED_FROM", kind:"horizontal"},
+    {source:"w_terre", target:"w_terra", type:"DERIVED_FROM", kind:"horizontal"},
+    {source:"w_tierra", target:"w_terra", type:"DERIVED_FROM", kind:"horizontal"},
+    {source:"w_terra_it", target:"w_terra", type:"DERIVED_FROM", kind:"horizontal"},
+    {source:"w_terra_pt", target:"w_terra", type:"DERIVED_FROM", kind:"horizontal"},
+
+    // Layer 2 -> 3 vertical — HAS_MEANING
+    {source:"w_aqua", target:"d_water", type:"HAS_MEANING", kind:"vertical"},
+    {source:"w_eau", target:"d_water", type:"HAS_MEANING", kind:"vertical"},
+    {source:"w_agua", target:"d_water", type:"HAS_MEANING", kind:"vertical"},
+    {source:"w_acqua", target:"d_water", type:"HAS_MEANING", kind:"vertical"},
+    {source:"w_agua_pt", target:"d_water", type:"HAS_MEANING", kind:"vertical"},
+    {source:"w_aqua", target:"d_baptism", type:"HAS_MEANING", kind:"vertical"},
+    {source:"w_terra", target:"d_land", type:"HAS_MEANING", kind:"vertical"},
+    {source:"w_terre", target:"d_land", type:"HAS_MEANING", kind:"vertical"},
+    {source:"w_tierra", target:"d_land", type:"HAS_MEANING", kind:"vertical"},
+    {source:"w_terra_it", target:"d_land", type:"HAS_MEANING", kind:"vertical"},
+    {source:"w_terra_it", target:"d_territory", type:"HAS_MEANING", kind:"vertical"},
+    {source:"w_terra_pt", target:"d_land", type:"HAS_MEANING", kind:"vertical"},
+
+    // Layer 3 horizontal — SYNONYM_OF
+    {source:"d_baptism", target:"d_water", type:"SYNONYM_OF", kind:"horizontal"},
+    {source:"d_territory", target:"d_land", type:"SYNONYM_OF", kind:"horizontal"},
+  ];
+
+  return {nodes, links};
+}
+
+/* ============================================================
+   RENDER + STATE LOGIC
+   ============================================================ */
+const {nodes, links} = buildGraph();
+const nodeById = new Map(nodes.map(n => [n.id, n]));
+
+// adjacency map for hover-highlighting (works across all links, any layer)
+const adjacency = new Map(nodes.map(n => [n.id, new Set()]));
+links.forEach(l => {
+  adjacency.get(l.source).add(l.target);
+  adjacency.get(l.target).add(l.source);
+});
+
+const width = 920, height = 560;
+const layerY = {1: 90, 2: 290, 3: 490};
+const layerNames = {1:"Languages", 2:"Words", 3:"Definitions"};
+const layerClass = {1:"layer-language", 2:"layer-word", 3:"layer-definition"};
+
+const svg = d3.select("#viz").attr("viewBox", [0,0,width,height]);
+const g = svg.append("g");
+
+svg.call(d3.zoom().scaleExtent([0.6,2.5]).on("zoom", (e) => g.attr("transform", e.transform)));
+
+const linkSel = g.append("g").selectAll("path")
+  .data(links).join("path")
+  .attr("class", d => "edge " + d.kind)
+  .attr("stroke", d => d.kind === "vertical" ? "#555" : (
+    nodeById.get(d.source.id ?? d.source).layer === 1 ? "var(--purple)" :
+    nodeById.get(d.source.id ?? d.source).layer === 2 ? "var(--teal)" : "var(--coral)"
+  ));
+
+const nodeSel = g.append("g").selectAll("g")
+  .data(nodes).join("g")
+  .attr("class", d => "node " + layerClass[d.layer])
+  .call(d3.drag()
+    .on("start", (e,d) => { if(!e.active) sim.alphaTarget(0.2).restart(); d.fx=d.x; d.fy=d.y; })
+    .on("drag", (e,d) => { d.fx=e.x; d.fy=d.y; })
+    .on("end", (e,d) => { if(!e.active) sim.alphaTarget(0); d.fx=null; d.fy=null; }));
+
+nodeSel.append("circle").attr("r", d => d.layer===1?30:26);
+nodeSel.append("text").text(d => d.label);
+
+nodeSel.on("click", (e,d) => {
+  e.stopPropagation();
+  if (d.layer === 1) { focus = {level:2, selectedLanguage:d.id, selectedWord:null}; }
+  else if (d.layer === 2) { focus = {level:3, selectedLanguage:d.lang, selectedWord:d.id}; }
+  render();
+});
+
+nodeSel.on("mouseenter", (e,d) => highlight(d.id));
+nodeSel.on("mouseleave", () => highlight(null));
+
+svg.on("click", () => { focus = {level:1, selectedLanguage:null, selectedWord:null}; render(); });
+
+const sim = d3.forceSimulation(nodes)
+  .force("link", d3.forceLink(links).id(d => d.id)
+    .distance(d => d.kind === "vertical" ? 160 : 90)
+    .strength(d => d.kind === "vertical" ? 0.25 : 0.7))
+  .force("charge", d3.forceManyBody().strength(-180))
+  .force("x", d3.forceX(width/2).strength(0.03))
+  .force("y", d3.forceY(d => layerY[d.layer]).strength(1))
+  .force("collide", d3.forceCollide(38))
+  .on("tick", ticked);
+
+function ticked(){
+  linkSel.attr("d", d => `M${d.source.x},${d.source.y} L${d.target.x},${d.target.y}`);
+  nodeSel.attr("transform", d => `translate(${d.x},${d.y})`);
+}
+
+// ---- focus state drives opacity per the A/B/C rule from the design spec ----
+let focus = {level:1, selectedLanguage:null, selectedWord:null};
+
+function opacityFor(layer){
+  const f = focus.level;
+  if (layer === f) return 1;
+  if (layer === f - 1) return 0.25;      // layer you came from: breadcrumb fade
+  if (layer === f + 1 && f === 1) return 0.25; // peek-ahead only at the very top
+  return 0;
+}
+
+function highlight(hoverId){
+  if (hoverId === null){
+    nodeSel.select("circle").attr("stroke-width", 1.5);
+    linkSel.attr("stroke-opacity", 1);
+    return;
+  }
+  const connected = adjacency.get(hoverId);
+  nodeSel.select("circle").attr("stroke-width", d => (d.id===hoverId || connected.has(d.id)) ? 3 : 1.5);
+  linkSel.attr("stroke-opacity", d => {
+    const s = d.source.id ?? d.source, t = d.target.id ?? d.target;
+    return (s===hoverId || t===hoverId) ? 1 : 0.15;
+  });
+}
+
+function render(){
+  nodeSel.transition().duration(400)
+    .style("opacity", d => {
+      if (focus.level >= 2 && d.layer === 2 && focus.selectedLanguage) {
+        // dim words that don't belong to the selected language, once we've drilled in
+        return d.lang === focus.selectedLanguage ? opacityFor(2) : opacityFor(2) * 0.4;
+      }
+      return opacityFor(d.layer);
+    })
+    .style("pointer-events", d => opacityFor(d.layer) === 0 ? "none" : "auto");
+
+  linkSel.transition().duration(400)
+    .style("opacity", d => {
+      const sLayer = nodeById.get(d.source.id ?? d.source).layer;
+      const tLayer = nodeById.get(d.target.id ?? d.target).layer;
+      const minOp = Math.min(opacityFor(sLayer), opacityFor(tLayer));
+      return minOp;
+    });
+
+  renderBreadcrumb();
+}
+
+function renderBreadcrumb(){
+  const bc = d3.select("#breadcrumb");
+  bc.html("");
+  bc.append("span").text("Languages").on("click", () => { focus={level:1,selectedLanguage:null,selectedWord:null}; render(); });
+  if (focus.selectedLanguage){
+    bc.append("span").attr("class","sep").text("›");
+    bc.append("span").text(nodeById.get(focus.selectedLanguage).label + " (words)")
+      .on("click", () => { focus={level:2, selectedLanguage:focus.selectedLanguage, selectedWord:null}; render(); });
+  }
+  if (focus.selectedWord){
+    bc.append("span").attr("class","sep").text("›");
+    bc.append("span").text(nodeById.get(focus.selectedWord).label + " (definitions)");
+  }
+}
+
+d3.select("#reset").on("click", () => { focus={level:1,selectedLanguage:null,selectedWord:null}; render(); });
+
+render();
+</script>
+</body>
+</html>
