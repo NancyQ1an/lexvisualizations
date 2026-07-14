@@ -124,6 +124,15 @@
 <script>
 const COLOR_PALETTE = ["#8b7fe8","#3fc9a0","#e88a6a","#e8b83f","#5fa8e8","#d46fc9","#7fbf5f","#e85f7f"];
 
+// Explicit map to clean dirty text inputs/typos down to clean source categories
+const SOURCE_NORMALIZATION_MAP = {
+  "pokorny": "Pokorny",
+  "picorni": "Pokorny",
+  "pokorny;": "Pokorny",
+  "liv": "LIV",
+  "liv;": "LIV"
+};
+
 const SAMPLE_NODES_CSV =
 `id,label,layer,layer_name
 lang_latin,Latin,1,Languages
@@ -146,9 +155,6 @@ d_baptism,ritual purification,3,Definitions
 d_land,solid ground / earth,3,Definitions
 d_territory,region under control,3,Definitions`;
 
-// NOTE: this now includes same-layer rows again (lang-lang, word-word, def-def) —
-// the previous version silently dropped every one of these due to a bug.
-// `type` is what drives the lineage-arrow styling for DEVELOPED_INTO edges.
 const SAMPLE_EDGES_CSV =
 `source,target,type,sources
 lang_latin,lang_french,DEVELOPED_INTO,LIV
@@ -201,12 +207,18 @@ function parseFile(file, cb){
   Papa.parse(file, {header:true, dynamicTyping:true, skipEmptyLines:true, complete: r => cb(r.data)});
 }
 
+// Utility function to clean and validate incoming source tokens
+function normalizeSourceToken(token) {
+  if (!token) return null;
+  const clean = token.trim().toLowerCase();
+  return SOURCE_NORMALIZATION_MAP[clean] || null; 
+}
+
 document.getElementById("nodesFile").addEventListener("change", e => {
   if (!e.target.files[0]) return;
   parseFile(e.target.files[0], data => { rawNodeRows = data; tryBuild(); });
 });
-// BUG FIX: source-filter checkboxes previously only populated for the sample
-// dataset because updateSourceFilters() was never called here.
+
 document.getElementById("edgesFile").addEventListener("change", e => {
   if (!e.target.files[0]) return;
   parseFile(e.target.files[0], data => { rawEdgeRows = data; updateSourceFilters(); tryBuild(); });
@@ -226,10 +238,15 @@ function updateSourceFilters() {
   if (!rawEdgeRows) return;
   const foundSources = new Set();
   rawEdgeRows.forEach(r => {
-    if (r.sources) String(r.sources).split(';').forEach(s => foundSources.add(s.trim()));
+    if (r.sources) {
+      String(r.sources).split(';').forEach(s => {
+        const normalized = normalizeSourceToken(s);
+        if (normalized) foundSources.add(normalized);
+      });
+    }
   });
 
-  selectedSources = new Set(foundSources); // reset cleanly per dataset instead of accumulating across loads
+  selectedSources = new Set(foundSources); 
 
   const container = document.getElementById("source-filters");
   container.innerHTML = "";
@@ -271,9 +288,6 @@ let focusIndex = 0, activeParentId = null;
 let activeAncestors = new Set();
 let numLayers = 0;
 
-// Transforms standard planar layout results into a pseudo-3D tunneling view.
-// Ancestor layers shrink toward the vanishing point (power-curve falloff);
-// not-yet-entered layers project outward as a "peek ahead" cue.
 function projectTo3D(node) {
   const centerX = width / 2;
   const centerY = height / 2;
@@ -322,8 +336,6 @@ function buildAndRender(nodeRows, edgeRows){
   });
   nodes.forEach(n => n.layerIndex = layerValueToIndex.get(n.layer));
 
-  // world-space y-band per layer, so multiple ancestor layers stay visually
-  // separated instead of piling up around a single forceCenter point
   layerBandY = new Map();
   layerValues.forEach((v,i) => layerBandY.set(i, 70 + i * (510 / Math.max(numLayers-1,1))));
 
@@ -336,15 +348,17 @@ function buildAndRender(nodeRows, edgeRows){
     const t = r.target !== undefined ? String(r.target) : "";
     if (!s || !t || !nodeById.has(s) || !nodeById.has(t)) return;
 
-    const edgeSrcs = r.sources ? String(r.sources).split(';').map(x => x.trim()).filter(Boolean) : [];
+    // Process sources array using the strict normalization logic
+    const edgeSrcs = r.sources 
+      ? String(r.sources).split(';').map(normalizeSourceToken).filter(Boolean) 
+      : [];
+      
     if (edgeSrcs.length > 0 && selectedSources.size > 0) {
       const hasMatch = edgeSrcs.some(src => selectedSources.has(src));
       if (!hasMatch) return;
     }
 
     const sNode = nodeById.get(s), tNode = nodeById.get(t);
-    // BUG FIX: same-layer edges (DEVELOPED_INTO, DERIVED_FROM, SYNONYM_OF)
-    // used to be dropped entirely here. They're kept now, tagged "horizontal".
     const kind = sNode.layerIndex === tNode.layerIndex ? "horizontal" : "vertical";
 
     links.push({source:s, target:t, type:r.type || "", kind, sourcesList: edgeSrcs, weight: edgeSrcs.length || 1});
@@ -356,8 +370,6 @@ function buildAndRender(nodeRows, edgeRows){
     }
   });
 
-  // rank edges by citation weight (more sources cited = more well-attested),
-  // used by the density slider instead of raw CSV row order
   const rankedByWeight = [...links].sort((a,b) => b.weight - a.weight);
   rankedByWeight.forEach((l, i) => l.densityRank = i);
 
@@ -513,8 +525,6 @@ function render(){
   });
 
   linkSel.style("opacity", (d) => {
-    // density limit now uses citation-weight rank, and only declutters the
-    // top-level overview — zoomed-in views always show full detail
     if (focusIndex === 0 && d.densityRank > maxAllowedRank) return 0.0;
 
     const sNode = nodeById.get(d.source.id || d.source);
