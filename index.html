@@ -59,10 +59,10 @@
 
   .node circle{stroke-width:1.5px; cursor:pointer; transition: r 0.4s, fill 0.4s, stroke-opacity 0.4s;}
   .node text{font-weight:500; fill:var(--text); pointer-events:none; text-anchor:middle; dominant-baseline:central; transition: font-size 0.4s, fill-opacity 0.4s;}
-  .edge{stroke-width:1.5px; fill:none; transition: stroke-opacity 0.4s, stroke 0.4s;}
-  .edge.horizontal{stroke-dasharray:4,4; stroke-width:1.8px;}
+  .edge{stroke-width:1.2px; fill:none; transition: stroke-opacity 0.4s, stroke 0.4s;}
+  .edge.horizontal{stroke-dasharray:3,3; stroke-width:1.5px;}
   .edge.vertical{stroke-dasharray:none;}
-  .edge.lineage{stroke-dasharray:none; stroke-width:2.5px;}
+  .edge.lineage{stroke-dasharray:none; stroke-width:2px;}
 
   #empty-state{position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); color:var(--muted); font-size:13px;}
 </style>
@@ -124,10 +124,12 @@
 <script>
 const COLOR_PALETTE = ["#8b7fe8","#3fc9a0","#e88a6a","#e8b83f","#5fa8e8","#d46fc9","#7fbf5f","#e85f7f"];
 
+// Dedicated colors assigned to specific structural source methodologies
 const SOURCE_COLORS = {
   "LIV": "#3fc9a0",
   "Pokorny": "#e88a6a",
-  "Consensus": "#5fa8e8", // Color for morphological / consensus synchronic lines
+  "Picorni": "#e88a6a",
+  "Consensus": "#5fa8e8",
   "Shared": "#535866"
 };
 
@@ -222,14 +224,13 @@ function parseFile(file, cb){
 function normalizeSourceToken(token) {
   if (!token) return null;
   const clean = token.trim().toLowerCase();
-  return SOURCE_NORMALIZATION_MAP[clean] || null; 
+  return SOURCE_NORMALIZATION_MAP[clean] || token.trim(); 
 }
 
 document.getElementById("nodesFile").addEventListener("change", e => {
   if (!e.target.files[0]) return;
   parseFile(e.target.files[0], data => { rawNodeRows = data; tryBuild(); });
 });
-
 document.getElementById("edgesFile").addEventListener("change", e => {
   if (!e.target.files[0]) return;
   parseFile(e.target.files[0], data => { rawEdgeRows = data; updateSourceFilters(); tryBuild(); });
@@ -265,7 +266,7 @@ function updateSourceFilters() {
 
   const allLabel = document.createElement("label");
   allLabel.className = "source-item";
-  allLabel.innerHTML = `<input type="checkbox" id="source-all" checked> <strong>Show All</strong>`;
+  allLabel.innerHTML = `<input type="checkbox" id="source-all" checked> <strong>Show All Sources</strong>`;
   container.appendChild(allLabel);
 
   foundSources.forEach(src => {
@@ -276,12 +277,6 @@ function updateSourceFilters() {
                      <span class="dot" style="background:${color}; width:8px; height:8px;"></span> ${src}`;
     container.appendChild(lbl);
   });
-
-  const sharedIndicator = document.createElement("div");
-  sharedIndicator.className = "chip";
-  sharedIndicator.style = "font-size:11px; margin-top:4px; padding-left:4px; color:var(--muted);";
-  sharedIndicator.innerHTML = `<span class="dot" style="background:${SOURCE_COLORS.Shared}; width:8px; height:8px;"></span> Consensus / Shared Link`;
-  container.appendChild(sharedIndicator);
 
   document.getElementById("source-all").addEventListener("change", e => {
     const chks = container.querySelectorAll(".src-chk");
@@ -323,8 +318,8 @@ function projectTo3D(node) {
   return { x: centerX + (node.x - centerX) * zScale, y: centerY + (node.y - centerY) * zScale, zScale: zScale };
 }
 
-function getEdgeColor(sourcesList) {
-  if (!sourcesList || sourcesList.length === 0) return SOURCE_COLORS.Shared;
+function getEdgeColor(sourcesList, sourceLayerIndex) {
+  if (!sourcesList || sourcesList.length === 0) return COLOR_PALETTE[sourceLayerIndex] || "#666";
   if (sourcesList.length > 1) return SOURCE_COLORS.Shared;
   return SOURCE_COLORS[sourcesList[0]] || SOURCE_COLORS.Shared;
 }
@@ -334,7 +329,7 @@ function buildAndRender(nodeRows, edgeRows){
   const svgEl = document.getElementById("viz");
   svgEl.style.display = "block"; svgEl.innerHTML = "";
 
-  selectedInspectedNodeId = null; // Clear inspection context on reconstruct
+  selectedInspectedNodeId = null; 
 
   const nodes = [];
   nodeRows.forEach(r => {
@@ -431,7 +426,7 @@ function buildAndRender(nodeRows, edgeRows){
   linkSel = g.append("g").selectAll("path")
     .data(links).join("path")
     .attr("class", d => "edge " + d.kind + (d.type === "DEVELOPED_INTO" ? " lineage" : ""))
-    .attr("stroke", d => getEdgeColor(d.sourcesList))
+    .attr("stroke", d => getEdgeColor(d.sourcesList, nodeById.get(d.source).layerIndex))
     .attr("marker-end", d => d.type === "DEVELOPED_INTO" ? "url(#arrow-lineage)" : null);
 
   nodeSel = g.append("g").selectAll("g")
@@ -451,9 +446,9 @@ function buildAndRender(nodeRows, edgeRows){
     // Switch behavior based on whether a word layer has synchronic connections to expose
     if (d.layerIndex === focusIndex && horizontalSynchronicNeighbors.get(d.id).size > 0) {
       if (selectedInspectedNodeId === d.id) {
-        selectedInspectedNodeId = null; // Toggle off on click
+        selectedInspectedNodeId = null; 
       } else {
-        selectedInspectedNodeId = d.id; // Switch inspection focus
+        selectedInspectedNodeId = d.id; 
       }
       render();
     } else if (d.layerIndex < numLayers - 1) {
@@ -537,7 +532,6 @@ function render(){
 
     if (dist === 0) {
       scaleFactor = 1.0; 
-      // Node visibility check on focused plane: show if parent matches, OR if it's the target of an activated synchronic view
       if (activeChildren) {
         if (activeChildren.has(d.id) || d.id === selectedInspectedNodeId || (synchronicNeighbors && synchronicNeighbors.has(d.id))) {
           opacityValue = 1.0;
@@ -557,7 +551,6 @@ function render(){
     }
 
     let baseRadius = 24;
-    // Add visual flare if the word is actively selected/inspected
     const isInspected = d.id === selectedInspectedNodeId;
     
     el.select("circle")
@@ -581,7 +574,6 @@ function render(){
     const sNode = nodeById.get(d.source.id || d.source);
     const tNode = nodeById.get(d.target.id || d.target);
 
-    // If it's a structural morphological line, only show it if its parent inspection node is clicked
     if (d.isSynchronicMorph) {
       if (selectedInspectedNodeId && (sNode.id === selectedInspectedNodeId || tNode.id === selectedInspectedNodeId)) {
         return 0.9;
