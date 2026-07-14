@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>CSV layer graph — semantic zoom</title>
+<title>CSV layer graph — Head-On Zoom</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 <style>
@@ -14,7 +14,6 @@
   body{margin:0; background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}
   #container{display:grid; grid-template-columns:280px 1fr; min-height:100vh;}
   
-  /* Sidebar styles */
   #sidebar {
     background:var(--panel); border-right:1px solid var(--line); padding:20px;
     display:flex; flex-direction:column; gap:20px; overflow-y:auto;
@@ -58,8 +57,8 @@
   #canvas-wrap{background:var(--panel); border:1px solid var(--line); border-radius:12px; overflow:hidden; flex-grow:1; position:relative;}
   svg{display:block; width:100%; height:100%; cursor:grab;}
   
-  .node circle{stroke-width:1.5px; cursor:pointer; transition: r 0.4s, fill 0.4s;}
-  .node text{font-weight:500; fill:var(--text); pointer-events:none; text-anchor:middle; dominant-baseline:central; transition: font-size 0.4s;}
+  .node circle{stroke-width:1.5px; cursor:pointer; transition: r 0.4s, fill 0.4s, stroke-opacity 0.4s;}
+  .node text{font-weight:500; fill:var(--text); pointer-events:none; text-anchor:middle; dominant-baseline:central; transition: font-size 0.4s, fill-opacity 0.4s;}
   .edge{stroke-width:1.2px; fill:none; transition: stroke-opacity 0.4s;}
   
   #empty-state{position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); color:var(--muted); font-size:13px;}
@@ -67,11 +66,10 @@
 </head>
 <body>
 <div id="container">
-  <!-- Left Workspace Control Panel & Filters -->
   <div id="sidebar">
     <div>
       <h1>CSV layer graph</h1>
-      <div class="sub">Semantic zoom & stratified visual workspace.</div>
+      <div class="sub">Head-on perspective workspace.</div>
     </div>
     
     <div class="field">
@@ -86,7 +84,7 @@
     <button id="loadSample">⚡ Load Sample Dataset</button>
     
     <div class="slider-wrap">
-      <div><label for="densitySlider">Edge Density Limit</label><span id="densityVal">30%</span></div>
+      <div><label for="densitySlider">Initial Edge Density</label><span id="densityVal">30%</span></div>
       <input type="range" id="densitySlider" min="10" max="100" value="30">
     </div>
 
@@ -107,7 +105,6 @@
     </div>
   </div>
 
-  <!-- Right Visual Canvas -->
   <div id="main-content">
     <div style="display:flex; justify-content:space-between; align-items:center;">
       <div id="breadcrumb"></div>
@@ -146,7 +143,6 @@ d_baptism,ritual purification,3,Definitions
 d_land,solid ground / earth,3,Definitions
 d_territory,region under control,3,Definitions`;
 
-// Enhanced to support multi-source competing etymology edge properties
 const SAMPLE_EDGES_CSV =
 `source,target,sources
 lang_latin,lang_french,LIV
@@ -220,7 +216,6 @@ function updateSourceFilters() {
   const container = document.getElementById("source-filters");
   container.innerHTML = "";
   
-  // "Show All Complexity" Checkbox
   const allLabel = document.createElement("label");
   allLabel.className = "source-item";
   allLabel.innerHTML = `<input type="checkbox" id="source-all" checked> <strong>Show All Complexity</strong>`;
@@ -254,7 +249,7 @@ function tryBuild(){
   try{ buildAndRender(rawNodeRows, rawEdgeRows); } catch(err){ setStatus("Error: " + err.message, "error"); }
 }
 
-let sim, svg, g, linkSel, nodeSel, layerY, numLayers, nodeById, verticalChildren, verticalParents, layerColor;
+let sim, svg, g, linkSel, nodeSel, width, height, nodeById, verticalChildren, verticalParents, layerColor;
 let focusIndex = 0, activeParentId = null;
 let activeAncestors = new Set();
 
@@ -296,7 +291,6 @@ function buildAndRender(nodeRows, edgeRows){
     const t = r.target !== undefined ? String(r.target) : "";
     if (!s || !t || !nodeById.has(s) || !nodeById.has(t)) return;
     
-    // Filter out rows by selected edge sources
     if (r.sources) {
       const edgeSrcs = String(r.sources).split(';').map(x => x.trim());
       const hasMatch = edgeSrcs.some(src => selectedSources.has(src));
@@ -321,13 +315,11 @@ function buildAndRender(nodeRows, edgeRows){
   const adjacency = new Map(nodes.map(n => [n.id, new Set()]));
   links.forEach(l => { adjacency.get(l.source).add(l.target); adjacency.get(l.target).add(l.source); });
 
-  const width = 680, height = Math.max(500, numLayers * 170);
-  layerY = {};
-  layerValues.forEach((v,i) => { layerY[i] = 70 + i * ((height - 140) / Math.max(numLayers-1, 1)); });
+  width = 700; height = 600;
 
   svg = d3.select("#viz").attr("viewBox", [0,0,width,height]);
   g = svg.append("g");
-  svg.call(d3.zoom().scaleExtent([0.4,3]).on("zoom", e => g.attr("transform", e.transform)));
+  svg.call(d3.zoom().scaleExtent([0.4,4]).on("zoom", e => g.attr("transform", e.transform)));
 
   linkSel = g.append("g").selectAll("path")
     .data(links).join("path")
@@ -359,12 +351,17 @@ function buildAndRender(nodeRows, edgeRows){
   svg.on("click", resetAll);
   document.getElementById("resetView").onclick = resetAll;
 
+  // Head-On Force Configuration: Target a shared center coordinate
   sim = d3.forceSimulation(nodes)
-    .force("link", d3.forceLink(links).id(d => d.id).distance(110).strength(0.5))
-    .force("charge", d3.forceManyBody().strength(-120))
-    .force("x", d3.forceX(width/2).strength(0.04))
-    .force("y", d3.forceY(d => layerY[d.layerIndex]).strength(1.2))
-    .force("collide", d3.forceCollide(30))
+    .force("link", d3.forceLink(links).id(d => d.id).distance(d => {
+      const sN = nodeById.get(d.source.id || d.source);
+      const tN = nodeById.get(d.target.id || d.target);
+      // Pushes current focused layer nodes further outward into a larger ring radius
+      return (sN.layerIndex === focusIndex || tN.layerIndex === focusIndex) ? 180 : 70;
+    }).strength(0.6))
+    .force("charge", d3.forceManyBody().strength(d => d.layerIndex === focusIndex ? -300 : -80))
+    .force("center", d3.forceCenter(width / 2, height / 2))
+    .force("collide", d3.forceCollide().radius(d => d.layerIndex === focusIndex ? 45 : 20))
     .on("tick", () => {
       linkSel.attr("d", d => `M${d.source.x},${d.source.y} L${d.target.x},${d.target.y}`);
       nodeSel.attr("transform", d => `translate(${d.x},${d.y})`);
@@ -402,48 +399,70 @@ function render(){
   const totalEdges = linkSel.size();
   const maxAllowedEdgeIndex = Math.ceil(totalEdges * densityThreshold);
 
-  // Apply Fading / 3D Head-On Scale Modifiers based on layer perspective distance
+  // Re-adjust force parameters based on new zoom focus positioning targets
+  if (sim) {
+    sim.force("center", d3.forceCenter(width / 2, height / 2));
+    sim.alpha(0.3).restart();
+  }
+
   nodeSel.each(function(d) {
     const el = d3.select(this);
-    let dist = Math.abs(d.layerIndex - focusIndex);
-    let scaleFactor = dist === 0 ? 1.0 : (dist === 1 ? 0.75 : 0.55);
-    let baseRadius = d.layerIndex === 0 ? 28 : 22;
+    let dist = d.layerIndex - focusIndex;
+    
+    let scaleFactor;
+    let opacityValue;
+    
+    if (dist === 0) {
+      // Foreground focus ring
+      scaleFactor = 1.0;
+      opacityValue = activeChildren ? (activeChildren.has(d.id) ? 1.0 : 0.0) : 1.0;
+    } else if (dist < 0 && activeAncestors.has(d.id)) {
+      // Vanishing background tunnel (ancestors)
+      let depthSteps = Math.abs(dist);
+      scaleFactor = depthSteps === 1 ? 0.55 : 0.35;
+      opacityValue = depthSteps === 1 ? 0.50 : 0.25;
+    } else if (focusIndex === 0 && d.layerIndex === 1) {
+      // Initial state sneak-peek
+      scaleFactor = 0.65;
+      opacityValue = 0.25;
+    } else {
+      // Completely hidden outside of the depth tunnel focus
+      scaleFactor = 0.0;
+      opacityValue = 0.0;
+    }
+
+    let baseRadius = 24;
 
     el.select("circle")
       .attr("r", baseRadius * scaleFactor)
-      .attr("fill", layerColor[d.layerIndex] + (dist === 0 ? "55" : "18"))
-      .attr("stroke", layerColor[d.layerIndex]);
+      .attr("fill", layerColor[d.layerIndex] + (dist === 0 ? "44" : "15"))
+      .attr("stroke", layerColor[d.layerIndex])
+      .style("stroke-opacity", opacityValue);
 
-    el.select("text").attr("font-size", (dist === 0 ? 11 : 9) + "px");
+    el.select("text")
+      .attr("font-size", (dist === 0 ? 11 : 8) + "px")
+      .style("fill-opacity", opacityValue)
+      .style("display", scaleFactor === 0 ? "none" : "block");
+      
+    el.style("opacity", opacityValue)
+      .style("pointer-events", opacityValue > 0 ? "auto" : "none");
   });
-
-  nodeSel.transition().duration(400)
-    .style("opacity", d => {
-      if (d.layerIndex === focusIndex) {
-        if (activeChildren) return activeChildren.has(d.id) ? 1.0 : 0.0;
-        return 1.0;
-      }
-      if (d.layerIndex < focusIndex) return activeAncestors.has(d.id) ? 0.35 : 0.0;
-      if (focusIndex === 0 && d.layerIndex === 1) return 0.35;
-      return 0.0;
-    })
-    .style("pointer-events", d => {
-      if (d.layerIndex === focusIndex && activeChildren && !activeChildren.has(d.id)) return "none";
-      if (d.layerIndex < focusIndex && !activeAncestors.has(d.id)) return "none";
-      return d.layerIndex === focusIndex ? "auto" : "none";
-    });
 
   linkSel.transition().duration(400)
     .style("opacity", (d, i) => {
-      // Gating edge display index order according to the progressive density slider
       if (i > maxAllowedEdgeIndex && focusIndex === 0) return 0.0;
 
       const sNode = nodeById.get(d.source.id || d.source);
       const tNode = nodeById.get(d.target.id || d.target);
+      
       const sVisible = (sNode.layerIndex === focusIndex && (!activeChildren || activeChildren.has(sNode.id))) || activeAncestors.has(sNode.id) || (focusIndex === 0 && sNode.layerIndex === 1);
       const tVisible = (tNode.layerIndex === focusIndex && (!activeChildren || activeChildren.has(tNode.id))) || activeAncestors.has(tNode.id) || (focusIndex === 0 && tNode.layerIndex === 1);
       
-      return (sVisible && tVisible) ? (Math.abs(sNode.layerIndex - focusIndex) === 0 ? 1.0 : 0.3) : 0.0;
+      if (sVisible && tVisible) {
+        // Fade the edges connecting backwards into the screen depth
+        return (sNode.layerIndex === focusIndex && tNode.layerIndex === focusIndex) ? 0.8 : 0.2;
+      }
+      return 0.0;
     });
 
   renderBreadcrumb();
