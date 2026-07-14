@@ -124,10 +124,10 @@
 <script>
 const COLOR_PALETTE = ["#8b7fe8","#3fc9a0","#e88a6a","#e8b83f","#5fa8e8","#d46fc9","#7fbf5f","#e85f7f"];
 
-// Explicit map to clean dirty text inputs/typos down to clean source categories
+// Strict normalization map. If it's not here, it gets filtered out of the system.
 const SOURCE_NORMALIZATION_MAP = {
   "pokorny": "Pokorny",
-  "picorni": "Pokorny",
+  "picorni": "Pokorny", // Typo redirection
   "pokorny;": "Pokorny",
   "liv": "LIV",
   "liv;": "LIV"
@@ -207,7 +207,7 @@ function parseFile(file, cb){
   Papa.parse(file, {header:true, dynamicTyping:true, skipEmptyLines:true, complete: r => cb(r.data)});
 }
 
-// Utility function to clean and validate incoming source tokens
+// Normalized token return helper
 function normalizeSourceToken(token) {
   if (!token) return null;
   const clean = token.trim().toLowerCase();
@@ -237,10 +237,12 @@ document.getElementById("densitySlider").addEventListener("input", e => {
 function updateSourceFilters() {
   if (!rawEdgeRows) return;
   const foundSources = new Set();
+  
   rawEdgeRows.forEach(r => {
     if (r.sources) {
       String(r.sources).split(';').forEach(s => {
         const normalized = normalizeSourceToken(s);
+        // Only collect strictly validated, non-null sources
         if (normalized) foundSources.add(normalized);
       });
     }
@@ -348,9 +350,9 @@ function buildAndRender(nodeRows, edgeRows){
     const t = r.target !== undefined ? String(r.target) : "";
     if (!s || !t || !nodeById.has(s) || !nodeById.has(t)) return;
 
-    // Process sources array using the strict normalization logic
+    // Filter, clean, and deduplicate with the strict normalization function
     const edgeSrcs = r.sources 
-      ? String(r.sources).split(';').map(normalizeSourceToken).filter(Boolean) 
+      ? Array.from(new Set(String(r.sources).split(';').map(normalizeSourceToken).filter(Boolean)))
       : [];
       
     if (edgeSrcs.length > 0 && selectedSources.size > 0) {
