@@ -59,10 +59,10 @@
 
   .node circle{stroke-width:1.5px; cursor:pointer; transition: r 0.4s, fill 0.4s, stroke-opacity 0.4s;}
   .node text{font-weight:500; fill:var(--text); pointer-events:none; text-anchor:middle; dominant-baseline:central; transition: font-size 0.4s, fill-opacity 0.4s;}
-  .edge{stroke-width:1.2px; fill:none; transition: stroke-opacity 0.4s;}
-  .edge.horizontal{stroke-dasharray:3,3;}
+  .edge{stroke-width:1.5px; fill:none; transition: stroke-opacity 0.4s, stroke 0.4s;}
+  .edge.horizontal{stroke-dasharray:4,4; stroke-width:1.8px;}
   .edge.vertical{stroke-dasharray:none;}
-  .edge.lineage{stroke-dasharray:none; stroke-width:2px;}
+  .edge.lineage{stroke-dasharray:none; stroke-width:2.5px;}
 
   #empty-state{position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); color:var(--muted); font-size:13px;}
 </style>
@@ -99,7 +99,7 @@
     </div>
 
     <div>
-      <h2>Filter by Sources</h2>
+      <h2>Filter & Source Colors</h2>
       <div id="source-filters"></div>
     </div>
 
@@ -124,13 +124,20 @@
 <script>
 const COLOR_PALETTE = ["#8b7fe8","#3fc9a0","#e88a6a","#e8b83f","#5fa8e8","#d46fc9","#7fbf5f","#e85f7f"];
 
-// Strict normalization map. If it's not here, it gets filtered out of the system.
+const SOURCE_COLORS = {
+  "LIV": "#3fc9a0",
+  "Pokorny": "#e88a6a",
+  "Consensus": "#5fa8e8", // Color for morphological / consensus synchronic lines
+  "Shared": "#535866"
+};
+
 const SOURCE_NORMALIZATION_MAP = {
   "pokorny": "Pokorny",
-  "picorni": "Pokorny", // Typo redirection
+  "picorni": "Pokorny",
   "pokorny;": "Pokorny",
   "liv": "LIV",
-  "liv;": "LIV"
+  "liv;": "LIV",
+  "consensus": "Consensus"
 };
 
 const SAMPLE_NODES_CSV =
@@ -150,6 +157,8 @@ w_terre,terre,2,Words
 w_tierra,tierra,2,Words
 w_terra_it,terra,2,Words
 w_terra_pt,terra,2,Words
+w_normal,normal,2,Words
+w_normalize,normalize,2,Words
 d_water,"clear liquid, H2O",3,Definitions
 d_baptism,ritual purification,3,Definitions
 d_land,solid ground / earth,3,Definitions
@@ -179,6 +188,9 @@ w_terre,w_terra,DERIVED_FROM,Pokorny
 w_tierra,w_terra,DERIVED_FROM,LIV
 w_terra_it,w_terra,DERIVED_FROM,Pokorny
 w_terra_pt,w_terra,DERIVED_FROM,Pokorny
+w_normal,lang_french,BELONGS_TO,Consensus
+w_normalize,lang_french,BELONGS_TO,Consensus
+w_normal,w_normalize,MORPH_DERIVED,Consensus
 w_aqua,d_water,HAS_MEANING,LIV;Pokorny
 w_eau,d_water,HAS_MEANING,LIV
 w_agua,d_water,HAS_MEANING,Pokorny
@@ -207,7 +219,6 @@ function parseFile(file, cb){
   Papa.parse(file, {header:true, dynamicTyping:true, skipEmptyLines:true, complete: r => cb(r.data)});
 }
 
-// Normalized token return helper
 function normalizeSourceToken(token) {
   if (!token) return null;
   const clean = token.trim().toLowerCase();
@@ -242,7 +253,6 @@ function updateSourceFilters() {
     if (r.sources) {
       String(r.sources).split(';').forEach(s => {
         const normalized = normalizeSourceToken(s);
-        // Only collect strictly validated, non-null sources
         if (normalized) foundSources.add(normalized);
       });
     }
@@ -255,15 +265,23 @@ function updateSourceFilters() {
 
   const allLabel = document.createElement("label");
   allLabel.className = "source-item";
-  allLabel.innerHTML = `<input type="checkbox" id="source-all" checked> <strong>Show All Sources</strong>`;
+  allLabel.innerHTML = `<input type="checkbox" id="source-all" checked> <strong>Show All</strong>`;
   container.appendChild(allLabel);
 
   foundSources.forEach(src => {
+    const color = SOURCE_COLORS[src] || "var(--muted)";
     const lbl = document.createElement("label");
     lbl.className = "source-item";
-    lbl.innerHTML = `<input type="checkbox" class="src-chk" data-src="${src}" checked> ${src}`;
+    lbl.innerHTML = `<input type="checkbox" class="src-chk" data-src="${src}" checked> 
+                     <span class="dot" style="background:${color}; width:8px; height:8px;"></span> ${src}`;
     container.appendChild(lbl);
   });
+
+  const sharedIndicator = document.createElement("div");
+  sharedIndicator.className = "chip";
+  sharedIndicator.style = "font-size:11px; margin-top:4px; padding-left:4px; color:var(--muted);";
+  sharedIndicator.innerHTML = `<span class="dot" style="background:${SOURCE_COLORS.Shared}; width:8px; height:8px;"></span> Consensus / Shared Link`;
+  container.appendChild(sharedIndicator);
 
   document.getElementById("source-all").addEventListener("change", e => {
     const chks = container.querySelectorAll(".src-chk");
@@ -285,7 +303,9 @@ function tryBuild(){
   try{ buildAndRender(rawNodeRows, rawEdgeRows); } catch(err){ setStatus("Error: " + err.message, "error"); }
 }
 
-let sim, svg, g, linkSel, nodeSel, width, height, nodeById, verticalChildren, verticalParents, layerColor, layerBandY;
+let sim, svg, g, linkSel, nodeSel, width, height, nodeById, verticalChildren, verticalParents;
+let horizontalSynchronicNeighbors, selectedInspectedNodeId;
+let layerColor, layerBandY;
 let focusIndex = 0, activeParentId = null;
 let activeAncestors = new Set();
 let numLayers = 0;
@@ -293,26 +313,28 @@ let numLayers = 0;
 function projectTo3D(node) {
   const centerX = width / 2;
   const centerY = height / 2;
-
   let depthDelta = node.layerIndex - focusIndex;
-
   let zScale = 1.0;
   if (depthDelta < 0) {
     zScale = Math.pow(0.45, Math.abs(depthDelta));
   } else if (depthDelta > 0) {
     zScale = Math.pow(1.6, depthDelta);
   }
+  return { x: centerX + (node.x - centerX) * zScale, y: centerY + (node.y - centerY) * zScale, zScale: zScale };
+}
 
-  const projectedX = centerX + (node.x - centerX) * zScale;
-  const projectedY = centerY + (node.y - centerY) * zScale;
-
-  return { x: projectedX, y: projectedY, zScale: zScale };
+function getEdgeColor(sourcesList) {
+  if (!sourcesList || sourcesList.length === 0) return SOURCE_COLORS.Shared;
+  if (sourcesList.length > 1) return SOURCE_COLORS.Shared;
+  return SOURCE_COLORS[sourcesList[0]] || SOURCE_COLORS.Shared;
 }
 
 function buildAndRender(nodeRows, edgeRows){
   document.getElementById("empty-state").style.display = "none";
   const svgEl = document.getElementById("viz");
   svgEl.style.display = "block"; svgEl.innerHTML = "";
+
+  selectedInspectedNodeId = null; // Clear inspection context on reconstruct
 
   const nodes = [];
   nodeRows.forEach(r => {
@@ -343,6 +365,7 @@ function buildAndRender(nodeRows, edgeRows){
 
   verticalChildren = new Map(nodes.map(n => [n.id, new Set()]));
   verticalParents = new Map(nodes.map(n => [n.id, new Set()]));
+  horizontalSynchronicNeighbors = new Map(nodes.map(n => [n.id, new Set()]));
   const links = [];
 
   edgeRows.forEach((r) => {
@@ -350,7 +373,6 @@ function buildAndRender(nodeRows, edgeRows){
     const t = r.target !== undefined ? String(r.target) : "";
     if (!s || !t || !nodeById.has(s) || !nodeById.has(t)) return;
 
-    // Filter, clean, and deduplicate with the strict normalization function
     const edgeSrcs = r.sources 
       ? Array.from(new Set(String(r.sources).split(';').map(normalizeSourceToken).filter(Boolean)))
       : [];
@@ -363,12 +385,22 @@ function buildAndRender(nodeRows, edgeRows){
     const sNode = nodeById.get(s), tNode = nodeById.get(t);
     const kind = sNode.layerIndex === tNode.layerIndex ? "horizontal" : "vertical";
 
-    links.push({source:s, target:t, type:r.type || "", kind, sourcesList: edgeSrcs, weight: edgeSrcs.length || 1});
+    links.push({
+      source:s, target:t, 
+      type:r.type || "", 
+      kind, 
+      sourcesList: edgeSrcs, 
+      weight: edgeSrcs.length || 1,
+      isSynchronicMorph: r.type === "MORPH_DERIVED"
+    });
 
     if (kind === "vertical") {
       const [parent, child] = sNode.layerIndex < tNode.layerIndex ? [sNode, tNode] : [tNode, sNode];
       verticalChildren.get(parent.id).add(child.id);
       verticalParents.get(child.id).add(parent.id);
+    } else if (kind === "horizontal" && r.type === "MORPH_DERIVED") {
+      horizontalSynchronicNeighbors.get(s).add(t);
+      horizontalSynchronicNeighbors.get(t).add(s);
     }
   });
 
@@ -385,7 +417,6 @@ function buildAndRender(nodeRows, edgeRows){
   links.forEach(l => { adjacency.get(l.source).add(l.target); adjacency.get(l.target).add(l.source); });
 
   width = 800; height = 650;
-
   svg = d3.select("#viz").attr("viewBox", [0,0,width,height]);
 
   svg.append("defs").append("marker")
@@ -400,7 +431,7 @@ function buildAndRender(nodeRows, edgeRows){
   linkSel = g.append("g").selectAll("path")
     .data(links).join("path")
     .attr("class", d => "edge " + d.kind + (d.type === "DEVELOPED_INTO" ? " lineage" : ""))
-    .attr("stroke", d => layerColor[nodeById.get(d.source).layerIndex] || "#666")
+    .attr("stroke", d => getEdgeColor(d.sourcesList))
     .attr("marker-end", d => d.type === "DEVELOPED_INTO" ? "url(#arrow-lineage)" : null);
 
   nodeSel = g.append("g").selectAll("g")
@@ -416,21 +447,31 @@ function buildAndRender(nodeRows, edgeRows){
 
   nodeSel.on("click", (e,d) => {
     e.stopPropagation();
-    if (d.layerIndex < numLayers - 1) {
+    
+    // Switch behavior based on whether a word layer has synchronic connections to expose
+    if (d.layerIndex === focusIndex && horizontalSynchronicNeighbors.get(d.id).size > 0) {
+      if (selectedInspectedNodeId === d.id) {
+        selectedInspectedNodeId = null; // Toggle off on click
+      } else {
+        selectedInspectedNodeId = d.id; // Switch inspection focus
+      }
+      render();
+    } else if (d.layerIndex < numLayers - 1) {
       focusIndex = d.layerIndex + 1; activeParentId = d.id;
+      selectedInspectedNodeId = null; 
       calculateAncestry(); render();
     }
   });
   nodeSel.on("mouseenter", (e,d) => highlight(d.id, adjacency));
   nodeSel.on("mouseleave", () => highlight(null, adjacency));
 
-  const resetAll = () => { focusIndex = 0; activeParentId = null; activeAncestors.clear(); render(); };
+  const resetAll = () => { focusIndex = 0; activeParentId = null; selectedInspectedNodeId = null; activeAncestors.clear(); render(); };
   svg.on("click", resetAll);
   document.getElementById("resetView").onclick = resetAll;
 
   sim = d3.forceSimulation(nodes)
     .force("link", d3.forceLink(links).id(d => d.id)
-      .distance(d => d.kind === "vertical" ? 150 : 100)
+      .distance(d => d.kind === "vertical" ? 150 : (d.isSynchronicMorph ? 60 : 100))
       .strength(d => d.kind === "vertical" ? 0.25 : 0.5))
     .force("charge", d3.forceManyBody().strength(-200))
     .force("x", d3.forceX(width / 2).strength(0.03))
@@ -482,6 +523,8 @@ function highlight(hoverId, adjacency){
 
 function render(){
   const activeChildren = activeParentId ? verticalChildren.get(activeParentId) : null;
+  const synchronicNeighbors = selectedInspectedNodeId ? horizontalSynchronicNeighbors.get(selectedInspectedNodeId) : null;
+  
   const totalEdges = linkSel.size();
   const maxAllowedRank = Math.ceil(totalEdges * densityThreshold) - 1;
 
@@ -490,31 +533,38 @@ function render(){
   nodeSel.each(function(d) {
     const el = d3.select(this);
     let dist = d.layerIndex - focusIndex;
-
-    let scaleFactor = 1.0;
-    let opacityValue = 1.0;
+    let scaleFactor = 1.0; let opacityValue = 1.0;
 
     if (dist === 0) {
-      scaleFactor = 1.0;
-      opacityValue = activeChildren ? (activeChildren.has(d.id) ? 1.0 : 0.0) : 1.0;
+      scaleFactor = 1.0; 
+      // Node visibility check on focused plane: show if parent matches, OR if it's the target of an activated synchronic view
+      if (activeChildren) {
+        if (activeChildren.has(d.id) || d.id === selectedInspectedNodeId || (synchronicNeighbors && synchronicNeighbors.has(d.id))) {
+          opacityValue = 1.0;
+        } else {
+          opacityValue = 0.0;
+        }
+      } else {
+        opacityValue = 1.0;
+      }
     } else if (dist < 0 && activeAncestors.has(d.id)) {
       let depthSteps = Math.abs(dist);
-      scaleFactor = depthSteps === 1 ? 0.6 : 0.4;
-      opacityValue = depthSteps === 1 ? 0.55 : 0.3;
+      scaleFactor = depthSteps === 1 ? 0.6 : 0.4; opacityValue = depthSteps === 1 ? 0.55 : 0.3;
     } else if (focusIndex === 0 && d.layerIndex === 1) {
-      scaleFactor = 0.7;
-      opacityValue = 0.3;
+      scaleFactor = 0.7; opacityValue = 0.3;
     } else {
-      scaleFactor = 0.0;
-      opacityValue = 0.0;
+      scaleFactor = 0.0; opacityValue = 0.0;
     }
 
     let baseRadius = 24;
-
+    // Add visual flare if the word is actively selected/inspected
+    const isInspected = d.id === selectedInspectedNodeId;
+    
     el.select("circle")
-      .attr("r", baseRadius * scaleFactor)
-      .attr("fill", layerColor[d.layerIndex] + (dist === 0 ? "35" : "10"))
-      .attr("stroke", layerColor[d.layerIndex])
+      .attr("r", baseRadius * scaleFactor * (isInspected ? 1.15 : 1.0))
+      .attr("fill", isInspected ? "var(--accent)" + "25" : layerColor[d.layerIndex] + (dist === 0 ? "35" : "10"))
+      .attr("stroke", isInspected ? "var(--accent)" : layerColor[d.layerIndex])
+      .style("stroke-width", isInspected ? "3px" : "1.5px")
       .style("stroke-opacity", opacityValue);
 
     el.select("text")
@@ -522,18 +572,25 @@ function render(){
       .style("fill-opacity", opacityValue)
       .style("display", scaleFactor === 0 ? "none" : "block");
 
-    el.style("opacity", opacityValue)
-      .style("pointer-events", opacityValue > 0 ? "auto" : "none");
+    el.style("opacity", opacityValue).style("pointer-events", opacityValue > 0 ? "auto" : "none");
   });
 
   linkSel.style("opacity", (d) => {
     if (focusIndex === 0 && d.densityRank > maxAllowedRank) return 0.0;
-
+    
     const sNode = nodeById.get(d.source.id || d.source);
     const tNode = nodeById.get(d.target.id || d.target);
 
-    const sVisible = (sNode.layerIndex === focusIndex && (!activeChildren || activeChildren.has(sNode.id))) || activeAncestors.has(sNode.id) || (focusIndex === 0 && sNode.layerIndex === 1);
-    const tVisible = (tNode.layerIndex === focusIndex && (!activeChildren || activeChildren.has(tNode.id))) || activeAncestors.has(tNode.id) || (focusIndex === 0 && tNode.layerIndex === 1);
+    // If it's a structural morphological line, only show it if its parent inspection node is clicked
+    if (d.isSynchronicMorph) {
+      if (selectedInspectedNodeId && (sNode.id === selectedInspectedNodeId || tNode.id === selectedInspectedNodeId)) {
+        return 0.9;
+      }
+      return 0.0;
+    }
+
+    const sVisible = (sNode.layerIndex === focusIndex && (!activeChildren || activeChildren.has(sNode.id) || sNode.id === selectedInspectedNodeId || (synchronicNeighbors && synchronicNeighbors.has(sNode.id)))) || activeAncestors.has(sNode.id) || (focusIndex === 0 && sNode.layerIndex === 1);
+    const tVisible = (tNode.layerIndex === focusIndex && (!activeChildren || activeChildren.has(tNode.id) || tNode.id === selectedInspectedNodeId || (synchronicNeighbors && synchronicNeighbors.has(tNode.id)))) || activeAncestors.has(tNode.id) || (focusIndex === 0 && tNode.layerIndex === 1);
 
     if (sVisible && tVisible) {
       return (sNode.layerIndex === focusIndex && tNode.layerIndex === focusIndex) ? 0.85 : 0.25;
@@ -553,6 +610,7 @@ function renderBreadcrumb(){
     span.textContent = labels[i] || ("Layer " + i);
     span.onclick = () => {
       focusIndex = i;
+      selectedInspectedNodeId = null;
       if (i === 0) activeParentId = null;
       else {
         let targetId = null;
