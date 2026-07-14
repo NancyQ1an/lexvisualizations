@@ -438,7 +438,6 @@ function buildAndRender(nodeRows, edgeRows){
   nodeSel.append("circle");
   nodeSel.append("text").text(d => d.label);
 
-  // FIXED: Clicking a node matches its actual depth index against focus depth to strictly toggle synchronic visibility
   nodeSel.on("click", (e,d) => {
     e.stopPropagation();
     
@@ -522,6 +521,26 @@ function render(){
   const activeChildren = activeParentId ? verticalChildren.get(activeParentId) : null;
   const synchronicNeighbors = selectedInspectedNodeId ? horizontalSynchronicNeighbors.get(selectedInspectedNodeId) : null;
   
+  // Find definitions associated with any active word or inspected word
+  const visibleDownstreamDefinitions = new Set();
+  if (activeChildren) {
+    activeChildren.forEach(childId => {
+      const subKids = verticalChildren.get(childId);
+      if (subKids) subKids.forEach(defId => visibleDownstreamDefinitions.add(defId));
+    });
+  }
+  if (selectedInspectedNodeId) {
+    const subKids = verticalChildren.get(selectedInspectedNodeId);
+    if (subKids) subKids.forEach(defId => visibleDownstreamDefinitions.add(defId));
+    
+    if (synchronicNeighbors) {
+      synchronicNeighbors.forEach(neighborId => {
+        const subKids = verticalChildren.get(neighborId);
+        if (subKids) subKids.forEach(defId => visibleDownstreamDefinitions.add(defId));
+      });
+    }
+  }
+
   const totalEdges = linkSel.size();
   const maxAllowedRank = Math.ceil(totalEdges * densityThreshold) - 1;
 
@@ -553,6 +572,15 @@ function render(){
     } else if (dist < 0 && activeAncestors.has(d.id)) {
       let depthSteps = Math.abs(dist);
       scaleFactor = depthSteps === 1 ? 0.6 : 0.4; opacityValue = depthSteps === 1 ? 0.55 : 0.3;
+    } else if (dist > 0 && focusIndex === 1 && d.layerIndex === 2) {
+      // We are on Layer 2 (Words), so Layer 3 (Definitions) is downstream (+1 steps)
+      if (visibleDownstreamDefinitions.has(d.id)) {
+        scaleFactor = 0.7; 
+        opacityValue = 0.4;
+      } else {
+        scaleFactor = 0.0;
+        opacityValue = 0.0;
+      }
     } else if (focusIndex === 0 && d.layerIndex === 1) {
       scaleFactor = 0.7; opacityValue = 0.3;
     } else {
@@ -599,8 +627,8 @@ function render(){
       return 0.0;
     }
 
-    const sVisible = (sNode.layerIndex === focusIndex && (!activeChildren || activeChildren.has(sNode.id) || sNode.id === selectedInspectedNodeId || (synchronicNeighbors && synchronicNeighbors.has(sNode.id)))) || activeAncestors.has(sNode.id) || (focusIndex === 0 && sNode.layerIndex === 1);
-    const tVisible = (tNode.layerIndex === focusIndex && (!activeChildren || activeChildren.has(tNode.id) || tNode.id === selectedInspectedNodeId || (synchronicNeighbors && synchronicNeighbors.has(tNode.id)))) || activeAncestors.has(tNode.id) || (focusIndex === 0 && tNode.layerIndex === 1);
+    const sVisible = (sNode.layerIndex === focusIndex && (!activeChildren || activeChildren.has(sNode.id) || sNode.id === selectedInspectedNodeId || (synchronicNeighbors && synchronicNeighbors.has(sNode.id)))) || activeAncestors.has(sNode.id) || (focusIndex === 0 && sNode.layerIndex === 1) || (focusIndex === 1 && sNode.layerIndex === 2 && visibleDownstreamDefinitions.has(sNode.id));
+    const tVisible = (tNode.layerIndex === focusIndex && (!activeChildren || activeChildren.has(tNode.id) || tNode.id === selectedInspectedNodeId || (synchronicNeighbors && synchronicNeighbors.has(tNode.id)))) || activeAncestors.has(tNode.id) || (focusIndex === 0 && tNode.layerIndex === 1) || (focusIndex === 1 && tNode.layerIndex === 2 && visibleDownstreamDefinitions.has(tNode.id));
 
     if (sVisible && tVisible) {
       return (sNode.layerIndex === focusIndex && tNode.layerIndex === focusIndex) ? 0.85 : 0.25;
