@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Etymological Workspace: Perspective + Tree</title>
+<title>Etymological Workspace</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 <style>
@@ -10,14 +10,11 @@
   body{margin:0; background:var(--bg); color:var(--text); font-family:sans-serif;}
   #container{display:grid; grid-template-columns:280px 1fr; min-height:100vh;}
   #sidebar{background:var(--panel); padding:20px; border-right:1px solid var(--line);}
-  #canvas-wrap{position:relative; flex-grow:1;}
+  #canvas-wrap{position:relative; flex-grow:1; overflow:hidden;}
   svg{width:100%; height:100%; cursor:grab;}
-  
-  /* Tree Styles */
   .node circle{stroke-width:2px; cursor:pointer;}
   .node text{font-weight:500; fill:var(--text); pointer-events:none;}
-  .edge{fill:none; stroke-opacity:0.6;}
-  .tree-branch{stroke-width:3px; stroke-dasharray:none !important;}
+  .edge{fill:none; stroke-opacity:0.5; transition: stroke-opacity 0.3s;}
 </style>
 </head>
 <body>
@@ -30,44 +27,32 @@
 </div>
 
 <script>
-// Logic: 
-// 1. If selectedInspectedNodeId is null, use current "zScale" projectTo3D logic.
-// 2. If selectedInspectedNodeId is set, use "Tree Layout" pinning (fixed X/Y).
-
 let selectedInspectedNodeId = null;
 let nodes = [], links = [];
+let sim, svg, g, linkSel, nodeSel;
 
+// Mapping projection: Perspective (Overview) vs Linear (Tree)
 function project(node) {
-  // If in tree mode, use the calculated tree positions
   if (selectedInspectedNodeId && node.treeX !== undefined) {
     return { x: node.treeX, y: node.treeY };
   }
-  
-  // Otherwise, use Perspective Projection (Pseudo-3D)
-  const centerX = 900/2;
-  const centerY = 600/2;
-  let depthDelta = node.layerIndex - (window.focusIndex || 0);
-  let zScale = Math.pow(0.5, Math.abs(depthDelta));
+  const centerX = 900/2, centerY = 600/2;
+  const depthDelta = node.layerIndex - (window.focusIndex || 0);
+  const zScale = Math.pow(0.5, Math.abs(depthDelta));
   return { 
     x: centerX + (node.x - centerX) * zScale, 
     y: centerY + (node.y - centerY) * zScale 
   };
 }
 
-// ... [Insert previous D3 initialization code here] ...
-
-// The core update loop for the "tick"
+// Tick function logic with safe pathing
 function tick() {
   linkSel.attr("d", d => {
     const sP = project(d.source);
     const tP = project(d.target);
-    
-    // BEAUTIFUL TREE CURVES when inspected
     if (selectedInspectedNodeId) {
-      return `M${sP.x},${sP.y} C${sP.x + (tP.x-sP.x)/2},${sP.y} ${sP.x + (tP.x-sP.x)/2},${tP.y} ${tP.x},${tP.y}`;
+      return `M${sP.x},${sP.y} L${tP.x},${tP.y}`;
     }
-    
-    // PERSPECTIVE CURVES when in overview
     const cx = (sP.x + tP.x) / 2;
     const cy = Math.min(sP.y, tP.y) - 30;
     return `M${sP.x},${sP.y} Q${cx},${cy} ${tP.x},${tP.y}`;
@@ -77,6 +62,34 @@ function tick() {
     const p = project(d);
     return `translate(${p.x},${p.y})`;
   });
+}
+
+// Click handler to toggle simulation state
+function handleNodeClick(e, d) {
+  e.stopPropagation();
+  if (selectedInspectedNodeId === d.id) {
+    selectedInspectedNodeId = null;
+    sim.alpha(0.3).restart(); // Wake physics up
+  } else {
+    selectedInspectedNodeId = d.id;
+    sim.stop(); // Freeze physics
+  }
+  render();
+}
+
+// Placeholder for your existing render/setup logic
+function render() {
+  if (nodeSel) {
+    nodeSel.attr("transform", d => {
+      const p = project(d);
+      return `translate(${p.x},${p.y})`;
+    });
+    linkSel.attr("d", d => {
+        const sP = project(d.source);
+        const tP = project(d.target);
+        return selectedInspectedNodeId ? `M${sP.x},${sP.y} L${tP.x},${tP.y}` : `M${sP.x},${sP.y} Q${(sP.x+tP.x)/2},${Math.min(sP.y,tP.y)-30} ${tP.x},${tP.y}`;
+    });
+  }
 }
 </script>
 </body>
