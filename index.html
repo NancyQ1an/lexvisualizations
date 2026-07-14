@@ -438,6 +438,7 @@ function buildAndRender(nodeRows, edgeRows){
   nodeSel.append("circle");
   nodeSel.append("text").text(d => d.label);
 
+  // FIXED: Clicking a node matches its actual depth index against focus depth to strictly toggle synchronic visibility
   nodeSel.on("click", (e,d) => {
     e.stopPropagation();
     
@@ -534,7 +535,6 @@ function render(){
     if (dist === 0) {
       scaleFactor = 1.0; 
       if (activeChildren) {
-        // FIXED: Check if this node is morphologically related to ANY node in the current active activeChildren group
         let isConnectedToVisibleChild = false;
         activeChildren.forEach(childId => {
           if (horizontalSynchronicNeighbors.get(childId) && horizontalSynchronicNeighbors.get(childId).has(d.id)) {
@@ -583,13 +583,11 @@ function render(){
     const sNode = nodeById.get(d.source.id || d.source);
     const tNode = nodeById.get(d.target.id || d.target);
 
-    // FIXED: Render morph links immediately if both items are on the active focus plane and structurally visible
     if (d.isSynchronicMorph || d.type === "MORPH_DERIVED") {
       if (sNode.layerIndex === focusIndex && tNode.layerIndex === focusIndex) {
         if (activeChildren) {
           const sVisible = activeChildren.has(sNode.id) || (selectedInspectedNodeId && sNode.id === selectedInspectedNodeId);
           const tVisible = activeChildren.has(tNode.id) || (selectedInspectedNodeId && tNode.id === selectedInspectedNodeId);
-          // If either side belongs to the focused parent cluster, show the morph connection line immediately
           if (activeChildren.has(sNode.id) || activeChildren.has(tNode.id)) return 0.85;
         } else {
           return 0.85;
