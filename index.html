@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>CSV layer graph — Head-On Zoom</title>
+<title>CSV Layer Graph — True Pseudo-3D Perspective</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 <style>
@@ -69,7 +69,7 @@
   <div id="sidebar">
     <div>
       <h1>CSV layer graph</h1>
-      <div class="sub">Head-on perspective workspace.</div>
+      <div class="sub">Semantic zoom & pseudo-3D perspective workspace.</div>
     </div>
     
     <div class="field">
@@ -84,7 +84,7 @@
     <button id="loadSample">⚡ Load Sample Dataset</button>
     
     <div class="slider-wrap">
-      <div><label for="densitySlider">Initial Edge Density</label><span id="densityVal">30%</span></div>
+      <div><label for="densitySlider">Edge Density Limit</label><span id="densityVal">30%</span></div>
       <input type="range" id="densitySlider" min="10" max="100" value="30">
     </div>
 
@@ -252,6 +252,30 @@ function tryBuild(){
 let sim, svg, g, linkSel, nodeSel, width, height, nodeById, verticalChildren, verticalParents, layerColor;
 let focusIndex = 0, activeParentId = null;
 let activeAncestors = new Set();
+let numLayers = 0;
+
+// Transforms standard planar layout results into a pseudo-3D tunneling view
+function projectTo3D(node) {
+  const centerX = width / 2;
+  const centerY = height / 2;
+
+  let depthDelta = node.layerIndex - focusIndex;
+
+  // Compute a scale modifier based on relative layer depth
+  let zScale = 1.0;
+  if (depthDelta < 0) {
+    // Ancestor paths recede cleanly backward toward the visual center
+    zScale = Math.pow(0.45, Math.abs(depthDelta));
+  } else if (depthDelta > 0) {
+    // Peek elements project wider and further outward toward screen edges
+    zScale = Math.pow(1.6, depthDelta);
+  }
+
+  const projectedX = centerX + (node.x - centerX) * zScale;
+  const projectedY = centerY + (node.y - centerY) * zScale;
+
+  return { x: projectedX, y: projectedY, zScale: zScale };
+}
 
 function buildAndRender(nodeRows, edgeRows){
   document.getElementById("empty-state").style.display = "none";
@@ -315,7 +339,7 @@ function buildAndRender(nodeRows, edgeRows){
   const adjacency = new Map(nodes.map(n => [n.id, new Set()]));
   links.forEach(l => { adjacency.get(l.source).add(l.target); adjacency.get(l.target).add(l.source); });
 
-  width = 700; height = 600;
+  width = 800; height = 650;
 
   svg = d3.select("#viz").attr("viewBox", [0,0,width,height]);
   g = svg.append("g");
@@ -351,20 +375,24 @@ function buildAndRender(nodeRows, edgeRows){
   svg.on("click", resetAll);
   document.getElementById("resetView").onclick = resetAll;
 
-  // Head-On Force Configuration: Target a shared center coordinate
+  // Setup forces to expand radially from a single flat center point
   sim = d3.forceSimulation(nodes)
-    .force("link", d3.forceLink(links).id(d => d.id).distance(d => {
-      const sN = nodeById.get(d.source.id || d.source);
-      const tN = nodeById.get(d.target.id || d.target);
-      // Pushes current focused layer nodes further outward into a larger ring radius
-      return (sN.layerIndex === focusIndex || tN.layerIndex === focusIndex) ? 180 : 70;
-    }).strength(0.6))
-    .force("charge", d3.forceManyBody().strength(d => d.layerIndex === focusIndex ? -300 : -80))
+    .force("link", d3.forceLink(links).id(d => d.id).distance(140).strength(0.4))
+    .force("charge", d3.forceManyBody().strength(-200))
     .force("center", d3.forceCenter(width / 2, height / 2))
-    .force("collide", d3.forceCollide().radius(d => d.layerIndex === focusIndex ? 45 : 20))
+    .force("collide", d3.forceCollide().radius(35))
     .on("tick", () => {
-      linkSel.attr("d", d => `M${d.source.x},${d.source.y} L${d.target.x},${d.target.y}`);
-      nodeSel.attr("transform", d => `translate(${d.x},${d.y})`);
+      // Direct projection interception
+      linkSel.attr("d", d => {
+        const sP = projectTo3D(d.source);
+        const tP = projectTo3D(d.target);
+        return `M${sP.x},${sP.y} L${tP.x},${tP.y}`;
+      });
+
+      nodeSel.attr("transform", d => {
+        const p = projectTo3D(d);
+        return `translate(${p.x},${p.y})`;
+      });
     });
 
   window.__layerLabel = layerLabel;
@@ -399,34 +427,28 @@ function render(){
   const totalEdges = linkSel.size();
   const maxAllowedEdgeIndex = Math.ceil(totalEdges * densityThreshold);
 
-  // Re-adjust force parameters based on new zoom focus positioning targets
   if (sim) {
-    sim.force("center", d3.forceCenter(width / 2, height / 2));
-    sim.alpha(0.3).restart();
+    sim.alpha(0.2).restart();
   }
 
   nodeSel.each(function(d) {
     const el = d3.select(this);
     let dist = d.layerIndex - focusIndex;
     
-    let scaleFactor;
-    let opacityValue;
+    let scaleFactor = 1.0;
+    let opacityValue = 1.0;
     
     if (dist === 0) {
-      // Foreground focus ring
       scaleFactor = 1.0;
       opacityValue = activeChildren ? (activeChildren.has(d.id) ? 1.0 : 0.0) : 1.0;
     } else if (dist < 0 && activeAncestors.has(d.id)) {
-      // Vanishing background tunnel (ancestors)
       let depthSteps = Math.abs(dist);
-      scaleFactor = depthSteps === 1 ? 0.55 : 0.35;
-      opacityValue = depthSteps === 1 ? 0.50 : 0.25;
+      scaleFactor = depthSteps === 1 ? 0.6 : 0.4;
+      opacityValue = depthSteps === 1 ? 0.55 : 0.3;
     } else if (focusIndex === 0 && d.layerIndex === 1) {
-      // Initial state sneak-peek
-      scaleFactor = 0.65;
-      opacityValue = 0.25;
+      scaleFactor = 0.7;
+      opacityValue = 0.3;
     } else {
-      // Completely hidden outside of the depth tunnel focus
       scaleFactor = 0.0;
       opacityValue = 0.0;
     }
@@ -435,7 +457,7 @@ function render(){
 
     el.select("circle")
       .attr("r", baseRadius * scaleFactor)
-      .attr("fill", layerColor[d.layerIndex] + (dist === 0 ? "44" : "15"))
+      .attr("fill", layerColor[d.layerIndex] + (dist === 0 ? "35" : "10"))
       .attr("stroke", layerColor[d.layerIndex])
       .style("stroke-opacity", opacityValue);
 
@@ -448,22 +470,20 @@ function render(){
       .style("pointer-events", opacityValue > 0 ? "auto" : "none");
   });
 
-  linkSel.transition().duration(400)
-    .style("opacity", (d, i) => {
-      if (i > maxAllowedEdgeIndex && focusIndex === 0) return 0.0;
+  linkSel.style("opacity", (d, i) => {
+    if (i > maxAllowedEdgeIndex && focusIndex === 0) return 0.0;
 
-      const sNode = nodeById.get(d.source.id || d.source);
-      const tNode = nodeById.get(d.target.id || d.target);
-      
-      const sVisible = (sNode.layerIndex === focusIndex && (!activeChildren || activeChildren.has(sNode.id))) || activeAncestors.has(sNode.id) || (focusIndex === 0 && sNode.layerIndex === 1);
-      const tVisible = (tNode.layerIndex === focusIndex && (!activeChildren || activeChildren.has(tNode.id))) || activeAncestors.has(tNode.id) || (focusIndex === 0 && tNode.layerIndex === 1);
-      
-      if (sVisible && tVisible) {
-        // Fade the edges connecting backwards into the screen depth
-        return (sNode.layerIndex === focusIndex && tNode.layerIndex === focusIndex) ? 0.8 : 0.2;
-      }
-      return 0.0;
-    });
+    const sNode = nodeById.get(d.source.id || d.source);
+    const tNode = nodeById.get(d.target.id || d.target);
+    
+    const sVisible = (sNode.layerIndex === focusIndex && (!activeChildren || activeChildren.has(sNode.id))) || activeAncestors.has(sNode.id) || (focusIndex === 0 && sNode.layerIndex === 1);
+    const tVisible = (tNode.layerIndex === focusIndex && (!activeChildren || activeChildren.has(tNode.id))) || activeAncestors.has(tNode.id) || (focusIndex === 0 && tNode.layerIndex === 1);
+    
+    if (sVisible && tVisible) {
+      return (sNode.layerIndex === focusIndex && tNode.layerIndex === focusIndex) ? 0.85 : 0.25;
+    }
+    return 0.0;
+  });
 
   renderBreadcrumb();
 }
