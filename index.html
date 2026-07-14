@@ -99,7 +99,7 @@
     </div>
 
     <div>
-      <h2>Filter & Source Colors</h2>
+      <h2>Filter by Sources</h2>
       <div id="source-filters"></div>
     </div>
 
@@ -124,7 +124,6 @@
 <script>
 const COLOR_PALETTE = ["#8b7fe8","#3fc9a0","#e88a6a","#e8b83f","#5fa8e8","#d46fc9","#7fbf5f","#e85f7f"];
 
-// Dedicated colors assigned to specific structural source methodologies
 const SOURCE_COLORS = {
   "LIV": "#3fc9a0",
   "Pokorny": "#e88a6a",
@@ -443,7 +442,6 @@ function buildAndRender(nodeRows, edgeRows){
   nodeSel.on("click", (e,d) => {
     e.stopPropagation();
     
-    // Switch behavior based on whether a word layer has synchronic connections to expose
     if (d.layerIndex === focusIndex && horizontalSynchronicNeighbors.get(d.id).size > 0) {
       if (selectedInspectedNodeId === d.id) {
         selectedInspectedNodeId = null; 
@@ -574,7 +572,7 @@ function render(){
     const sNode = nodeById.get(d.source.id || d.source);
     const tNode = nodeById.get(d.target.id || d.target);
 
-    if (d.isSynchronicMorph) {
+    if (d.isSynchronicMorph || d.type === "MORPH_DERIVED") {
       if (selectedInspectedNodeId && (sNode.id === selectedInspectedNodeId || tNode.id === selectedInspectedNodeId)) {
         return 0.9;
       }
