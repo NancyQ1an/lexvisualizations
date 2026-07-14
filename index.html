@@ -59,7 +59,7 @@
 
   .node circle{stroke-width:1.5px; cursor:pointer; transition: r 0.4s, fill 0.4s, stroke-opacity 0.4s;}
   .node text{font-weight:500; fill:var(--text); pointer-events:none; transition: font-size 0.4s, fill-opacity 0.4s;}
-  .node text.gloss{font-weight:400; fill:var(--muted); font-size:10px;}
+  .node text.gloss{font-weight:400; fill:var(--muted); font-size:11px;}
   
   .edge{stroke-width:1.2px; fill:none; transition: stroke-opacity 0.4s, stroke 0.4s;}
   .edge.horizontal{stroke-dasharray:3,3; stroke-width:1.5px;}
@@ -182,7 +182,7 @@ w_pie_te,lang_pie,BELONGS_TO,Pokorny
 w_aqua,lang_latin,BELONGS_TO,LIV;Pokorny
 w_eau,lang_french,BELONGS_TO,LIV
 w_agua,lang_spanish,BELONGS_TO,Pokorny
-w_acqua,lang_italian,BELONGS_TO,Pokorny
+w_acqua,italian,BELONGS_TO,Pokorny
 w_agua_pt,lang_portuguese,BELONGS_TO,LIV
 w_terra,lang_latin,BELONGS_TO,Pokorny;LIV
 w_terre,lang_french,BELONGS_TO,Pokorny
@@ -314,7 +314,6 @@ let activeAncestors = new Set();
 let numLayers = 0;
 
 function projectTo3D(node) {
-  // If tree view is active, use pinned layout coordinates
   if (selectedInspectedNodeId && node.treeX !== undefined) {
     return { x: node.treeX, y: node.treeY, zScale: 1.0 };
   }
@@ -458,27 +457,40 @@ function buildAndRender(nodeRows, edgeRows){
 
   nodeSel.append("circle");
   
-  // Main Label text
   nodeSel.append("text")
     .attr("class", "label-main")
     .attr("text-anchor", "middle")
     .attr("dominant-baseline", "central")
     .text(d => d.label);
 
-  // Definition/Gloss subtitle text element
   nodeSel.append("text")
     .attr("class", "gloss")
     .attr("text-anchor", "middle")
     .attr("dy", "16px")
     .text("");
 
+  // --- OVERHAULED CLICK INTERACTION HANDLER ---
   nodeSel.on("click", (e,d) => {
     e.stopPropagation();
-    if (d.layerIndex === focusIndex) {
-      selectedInspectedNodeId = (selectedInspectedNodeId === d.id) ? null : d.id; 
+    
+    // Rule: Clicking ANY node in the word layer (Layer Index 1) ALWAYS activates or toggles the tree view instantly
+    if (d.layerIndex === 1) {
+      if (selectedInspectedNodeId === d.id) {
+        selectedInspectedNodeId = null; // Toggle off if clicking the same node again
+      } else {
+        selectedInspectedNodeId = d.id; // Focus layout directly onto this word's line
+        focusIndex = 1; // Sync breadcrumbs back to the word view level automatically
+      }
       render();
     } 
-    else if (d.layerIndex < numLayers - 1) {
+    // Fallback: Default hierarchical workspace exploration clicks for non-word layers
+    else if (d.layerIndex === focusIndex) {
+      // Allow toggling for definitions if needed
+      if (d.layerIndex === 2) {
+        selectedInspectedNodeId = (selectedInspectedNodeId === d.id) ? null : d.id;
+        render();
+      }
+    } else if (d.layerIndex < numLayers - 1) {
       focusIndex = d.layerIndex + 1; 
       activeParentId = d.id;
       selectedInspectedNodeId = null; 
@@ -507,7 +519,6 @@ function buildAndRender(nodeRows, edgeRows){
         const sP = projectTo3D(d.source);
         const tP = projectTo3D(d.target);
         
-        // Beautiful elegant dendritic curve drawing if tree view mode is active
         if (selectedInspectedNodeId && (d.type === "DERIVED_FROM" || d.kind === "vertical" || d.type === "HAS_MEANING")) {
           const dx = tP.x - sP.x;
           return `M${sP.x},${sP.y} C${sP.x + dx / 2},${sP.y} ${sP.x + dx / 2},${tP.y} ${tP.x},${tP.y}`;
@@ -575,21 +586,16 @@ function getDiachronicWordDescendants(nodeId, results = new Set()) {
 }
 
 function computeTreeLayoutPositions(targetId, relatives, definitions) {
-  // 1. Gather active lineage chain
   const rootAncestors = Array.from(getDiachronicWordAncestors(targetId)).filter(id => nodeById.has(id));
   const descendants = Array.from(getDiachronicWordDescendants(targetId)).filter(id => nodeById.has(id));
   
-  // Arrange chronology bands from left to right
   let roots = rootAncestors.filter(id => diachronicAncestors.get(id).size === 0);
   if (roots.length === 0 && nodeById.has(targetId) && diachronicAncestors.get(targetId).size === 0) {
     roots = [targetId];
   }
 
-  // Clear older coordinates
   nodeById.forEach(n => { n.treeX = undefined; n.treeY = undefined; });
 
-  // 2. Map structural stages horizontally
-  // Stage 1: Ancient Roots (PIE) -> Stage 2: Intermediate Core (Latin) -> Stage 3: Modern Offspring -> Stage 4: Definitions
   const lanes = [[], [], [], []];
 
   roots.forEach(rId => lanes[0].push(rId));
@@ -601,14 +607,12 @@ function computeTreeLayoutPositions(targetId, relatives, definitions) {
   descendants.forEach(id => { if(!lanes[0].includes(id) && !lanes[1].includes(id) && !lanes[2].includes(id)) lanes[2].push(id); });
   definitions.forEach(id => lanes[3].push(id));
 
-  // If a lane is empty, shift item arrays gracefully to maintain layout parity
   if (lanes[1].length === 0 && lanes[2].length > 0) {
     lanes[1] = lanes[2]; lanes[2] = [];
   }
 
   const laneXPositions = [140, 360, 580, 800];
 
-  // 3. Stagger Y positions elegantly to construct the branches
   lanes.forEach((laneNodes, laneIdx) => {
     const total = laneNodes.length;
     laneNodes.forEach((id, itemIdx) => {
@@ -619,7 +623,6 @@ function computeTreeLayoutPositions(targetId, relatives, definitions) {
     });
   });
 
-  // 4. Anchor structural language header tags directly above their etymology column nodes
   relatives.forEach(wordId => {
     const wordNode = nodeById.get(wordId);
     const parentLangIds = verticalParents.get(wordId);
@@ -628,7 +631,7 @@ function computeTreeLayoutPositions(targetId, relatives, definitions) {
         const langNode = nodeById.get(langId);
         if (langNode) {
           langNode.treeX = wordNode.treeX;
-          langNode.treeY = wordNode.treeY - 45; // Float language directly over its word branch
+          langNode.treeY = wordNode.treeY - 45; 
         }
       });
     }
@@ -655,10 +658,8 @@ function render(){
   if (selectedInspectedNodeId) {
     diachronicWordRelatives.forEach(collectDefs);
     if (synchronicNeighbors) synchronicNeighbors.forEach(collectDefs);
-    // Switch simulation over to Tree mode coordinate pinning
     computeTreeLayoutPositions(selectedInspectedNodeId, diachronicWordRelatives, visibleDownstreamDefinitions);
   } else {
-    // Standard layout mode: clear tree bindings
     nodeById.forEach(n => { n.treeX = undefined; n.treeY = undefined; });
     if (activeChildren) {
       activeChildren.forEach(childId => {
@@ -679,9 +680,7 @@ function render(){
     let scaleFactor = 1.0; let opacityValue = 1.0;
     let inlineGlossText = "";
 
-    // Determine visibility conditions
     if (selectedInspectedNodeId) {
-      // --- INTERACTIVE HORIZONTAL TREE MODE ACTIVATE ---
       const parentLangsOfActiveWords = new Set();
       diachronicWordRelatives.forEach(wId => {
         const parents = verticalParents.get(wId);
@@ -696,8 +695,7 @@ function render(){
         opacityValue = 1.0;
         scaleFactor = d.layerIndex === 0 ? 0.75 : (d.id === selectedInspectedNodeId ? 1.2 : 1.0);
         
-        // Pull Definition data down into secondary typography lines under the word node
-        if (d.layerIndex === 1) { // Word layer
+        if (d.layerIndex === 1) { 
           const meanings = [];
           const targets = verticalChildren.get(d.id);
           if (targets) {
@@ -713,7 +711,6 @@ function render(){
         scaleFactor = 0.0;
       }
     } else {
-      // --- BROAD PERSPECTIVE EXPLORER MODE ---
       if (dist === 0) {
         scaleFactor = 1.0; 
         if (activeChildren) {
@@ -760,7 +757,6 @@ function render(){
       .style("fill", d.layerIndex === 0 ? "var(--muted)" : "var(--text)")
       .style("display", scaleFactor === 0 ? "none" : "block");
 
-    // Populate inline tree sub-text glosses
     el.select("text.gloss")
       .text(inlineGlossText)
       .style("fill-opacity", opacityValue)
@@ -776,7 +772,6 @@ function render(){
     const tNode = nodeById.get(d.target.id || d.target);
 
     if (selectedInspectedNodeId) {
-      // Isolate links belonging specifically to active tree components
       const hasMeaningLink = d.type === "HAS_MEANING" && (diachronicWordRelatives.has(sNode.id) || diachronicWordRelatives.has(tNode.id));
       const hasDiachronicTreeLink = d.type === "DERIVED_FROM" && diachronicWordRelatives.has(sNode.id) && diachronicWordRelatives.has(tNode.id);
       const hasLangTagLink = d.type === "BELONGS_TO" && diachronicWordRelatives.has(sNode.id || tNode.id);
@@ -785,7 +780,6 @@ function render(){
       return 0.0;
     }
 
-    // Standard structural links mapping rule for browse views
     if (d.isSynchronicMorph || d.type === "MORPH_DERIVED") {
       if (sNode.layerIndex === focusIndex && tNode.layerIndex === focusIndex) {
         return activeChildren ? ((activeChildren.has(sNode.id) || activeChildren.has(tNode.id)) ? 0.85 : 0.0) : 0.85;
@@ -806,7 +800,6 @@ function render(){
     return (sVisible && tVisible) ? ((sNode.layerIndex === focusIndex && tNode.layerIndex === focusIndex) ? 0.85 : 0.25) : 0.0;
   });
 
-  // Dynamically assign edge curve structural class names for rendering updates
   linkSel.attr("class", d => "edge " + d.kind + 
     ((d.type === "DEVELOPED_INTO" || d.type === "DERIVED_FROM") ? " lineage" : "") + 
     ((selectedInspectedNodeId && d.type === "DERIVED_FROM") ? " tree-branch" : ""));
