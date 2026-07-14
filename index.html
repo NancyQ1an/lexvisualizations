@@ -408,7 +408,6 @@ function buildAndRender(nodeRows, edgeRows){
         horizontalSynchronicNeighbors.get(s).add(t);
         horizontalSynchronicNeighbors.get(t).add(s);
       } else if (r.type === "DERIVED_FROM") {
-        // Track the word-to-word historical diachronic derivations
         diachronicAncestors.get(s).add(t);
         diachronicDescendants.get(t).add(s);
       }
@@ -535,7 +534,6 @@ function highlight(hoverId, adjacency){
   linkSel.style("stroke-opacity", d => (d.source.id===hoverId || d.target.id===hoverId || d.source===hoverId || d.target===hoverId) ? 1 : 0.1);
 }
 
-// Trace ancestors recursively on the word layer
 function getDiachronicWordAncestors(nodeId, results = new Set()) {
   const parents = diachronicAncestors.get(nodeId);
   if (parents) {
@@ -549,7 +547,6 @@ function getDiachronicWordAncestors(nodeId, results = new Set()) {
   return results;
 }
 
-// Trace descendants recursively on the word layer
 function getDiachronicWordDescendants(nodeId, results = new Set()) {
   const kids = diachronicDescendants.get(nodeId);
   if (kids) {
@@ -567,21 +564,13 @@ function render(){
   const activeChildren = activeParentId ? verticalChildren.get(activeParentId) : null;
   const synchronicNeighbors = selectedInspectedNodeId ? horizontalSynchronicNeighbors.get(selectedInspectedNodeId) : null;
   
-  // Recursively collect all word-to-word diachronic relatives of our inspected node
   const diachronicWordRelatives = new Set();
   if (selectedInspectedNodeId) {
     getDiachronicWordAncestors(selectedInspectedNodeId, diachronicWordRelatives);
     getDiachronicWordDescendants(selectedInspectedNodeId, diachronicWordRelatives);
   }
 
-  // Find definitions associated with any active, inspected, synchronic, or diachronic word
   const visibleDownstreamDefinitions = new Set();
-  if (activeChildren) {
-    activeChildren.forEach(childId => {
-      const subKids = verticalChildren.get(childId);
-      if (subKids) subKids.forEach(defId => visibleDownstreamDefinitions.add(defId));
-    });
-  }
   
   const collectDefs = (wordId) => {
     const subKids = verticalChildren.get(wordId);
@@ -589,9 +578,16 @@ function render(){
   };
 
   if (selectedInspectedNodeId) {
+    // Isolated Mode: Collect definitions exclusively for the active tree nodes
     collectDefs(selectedInspectedNodeId);
     if (synchronicNeighbors) synchronicNeighbors.forEach(collectDefs);
     diachronicWordRelatives.forEach(collectDefs);
+  } else if (activeChildren) {
+    // Broad Mode: Collect definitions for all family children
+    activeChildren.forEach(childId => {
+      const subKids = verticalChildren.get(childId);
+      if (subKids) subKids.forEach(defId => visibleDownstreamDefinitions.add(defId));
+    });
   }
 
   const totalEdges = linkSel.size();
@@ -606,7 +602,17 @@ function render(){
 
     if (dist === 0) {
       scaleFactor = 1.0; 
-      if (activeChildren) {
+      
+      if (selectedInspectedNodeId) {
+        // ONLY reveal exact lineage mapping
+        if (d.id === selectedInspectedNodeId || 
+            (synchronicNeighbors && synchronicNeighbors.has(d.id)) ||
+            diachronicWordRelatives.has(d.id)) {
+          opacityValue = 1.0;
+        } else {
+          opacityValue = 0.0;
+        }
+      } else if (activeChildren) {
         let isConnectedToVisibleChild = false;
         activeChildren.forEach(childId => {
           if (horizontalSynchronicNeighbors.get(childId) && horizontalSynchronicNeighbors.get(childId).has(d.id)) {
@@ -614,12 +620,7 @@ function render(){
           }
         });
 
-        // Visible if clicked directly, derived synchronically, or descended/derived diachronically
-        if (activeChildren.has(d.id) || 
-            isConnectedToVisibleChild || 
-            d.id === selectedInspectedNodeId || 
-            (synchronicNeighbors && synchronicNeighbors.has(d.id)) ||
-            diachronicWordRelatives.has(d.id)) {
+        if (activeChildren.has(d.id) || isConnectedToVisibleChild) {
           opacityValue = 1.0;
         } else {
           opacityValue = 0.0;
@@ -631,7 +632,6 @@ function render(){
       let depthSteps = Math.abs(dist);
       scaleFactor = depthSteps === 1 ? 0.6 : 0.4; opacityValue = depthSteps === 1 ? 0.55 : 0.3;
     } else if (dist > 0 && focusIndex === 1 && d.layerIndex === 2) {
-      // Show Layer 3 Definitions downstream of visible words
       if (visibleDownstreamDefinitions.has(d.id)) {
         scaleFactor = 0.7; 
         opacityValue = 0.4;
@@ -669,22 +669,21 @@ function render(){
     const sNode = nodeById.get(d.source.id || d.source);
     const tNode = nodeById.get(d.target.id || d.target);
 
-    // Render Synchronic (MORPH_DERIVED) links
+    // Synchronic (MORPH_DERIVED) links
     if (d.isSynchronicMorph || d.type === "MORPH_DERIVED") {
       if (sNode.layerIndex === focusIndex && tNode.layerIndex === focusIndex) {
-        if (activeChildren) {
+        if (selectedInspectedNodeId) {
+          if (sNode.id === selectedInspectedNodeId || tNode.id === selectedInspectedNodeId) return 0.85;
+        } else if (activeChildren) {
           if (activeChildren.has(sNode.id) || activeChildren.has(tNode.id)) return 0.85;
         } else {
           return 0.85;
         }
       }
-      if (selectedInspectedNodeId && (sNode.id === selectedInspectedNodeId || tNode.id === selectedInspectedNodeId)) {
-        return 0.9;
-      }
       return 0.0;
     }
 
-    // Render word-to-word Diachronic (DERIVED_FROM) links
+    // Word-to-word Diachronic (DERIVED_FROM) links
     if (d.type === "DERIVED_FROM") {
       if (sNode.layerIndex === focusIndex && tNode.layerIndex === focusIndex) {
         if (selectedInspectedNodeId) {
@@ -700,7 +699,7 @@ function render(){
       return 0.0;
     }
 
-    // Standard Vertical Parent/Child links
+    // Vertical structural scaffolding
     const sVisible = (sNode.layerIndex === focusIndex && (!activeChildren || activeChildren.has(sNode.id) || sNode.id === selectedInspectedNodeId || (synchronicNeighbors && synchronicNeighbors.has(sNode.id)) || diachronicWordRelatives.has(sNode.id))) || activeAncestors.has(sNode.id) || (focusIndex === 0 && sNode.layerIndex === 1) || (focusIndex === 1 && sNode.layerIndex === 2 && visibleDownstreamDefinitions.has(sNode.id));
     const tVisible = (tNode.layerIndex === focusIndex && (!activeChildren || activeChildren.has(tNode.id) || tNode.id === selectedInspectedNodeId || (synchronicNeighbors && synchronicNeighbors.has(tNode.id)) || diachronicWordRelatives.has(tNode.id))) || activeAncestors.has(tNode.id) || (focusIndex === 0 && tNode.layerIndex === 1) || (focusIndex === 1 && tNode.layerIndex === 2 && visibleDownstreamDefinitions.has(tNode.id));
 
