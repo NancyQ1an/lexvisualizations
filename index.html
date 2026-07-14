@@ -2,93 +2,831 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Etymological Workspace</title>
+<title>CSV Layer Graph — Etymological Tree Workspace</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 <style>
-  :root{--bg:#12141a; --panel:#1a1d25; --line:#2a2e38; --text:#e8e8ea; --muted:#8a8d98; --accent:#8b7fe8;}
-  body{margin:0; background:var(--bg); color:var(--text); font-family:sans-serif;}
+  :root{
+    --bg:#12141a; --panel:#1a1d25; --line:#2a2e38;
+    --text:#e8e8ea; --muted:#8a8d98; --err:#e8746a; --accent:#8b7fe8;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}
   #container{display:grid; grid-template-columns:280px 1fr; min-height:100vh;}
-  #sidebar{background:var(--panel); padding:20px; border-right:1px solid var(--line);}
-  #canvas-wrap{position:relative; flex-grow:1; overflow:hidden;}
-  svg{width:100%; height:100%; cursor:grab;}
-  .node circle{stroke-width:2px; cursor:pointer;}
-  .node text{font-weight:500; fill:var(--text); pointer-events:none;}
-  .edge{fill:none; stroke-opacity:0.5; transition: stroke-opacity 0.3s;}
+
+  #sidebar {
+    background:var(--panel); border-right:1px solid var(--line); padding:20px;
+    display:flex; flex-direction:column; gap:20px; overflow-y:auto;
+  }
+  #main-content { padding:20px; display:flex; flex-direction:column; gap:12px; }
+
+  h1{font-size:16px; font-weight:600; margin:0 0 4px;}
+  h2{font-size:12px; font-weight:600; color:var(--muted); margin:0 0 8px; text-transform:uppercase; letter-spacing:0.5px;}
+  .sub{font-size:12px; color:var(--muted); margin-bottom:4px;}
+
+  .field{display:flex; flex-direction:column; gap:6px;}
+  .field label{font-size:11px; color:var(--muted);}
+  .field input[type=file]{font-size:12px; color:var(--text); width:100%;}
+
+  .slider-wrap { display:flex; flex-direction:column; gap:4px; font-size:11px; color:var(--muted); }
+  .slider-wrap div { display:flex; justify-content:space-between; }
+
+  button{
+    font-size:12px; color:var(--text); background:#242832; border:1px solid var(--line);
+    border-radius:6px; padding:8px 12px; cursor:pointer; width:100%; text-align:left;
+  }
+  button:hover{border-color:var(--muted); background:#2a2f3b;}
+  button.ghost{background:none; color:var(--muted); border-style:dashed;}
+
+  #status{font-size:12px; min-height:16px;}
+  #status.error{color:var(--err);}
+  #status.ok{color:#6fcf97;}
+
+  #legend, #source-filters{display:flex; flex-direction:column; gap:8px; font-size:12px;}
+  .chip{display:flex; align-items:center; gap:8px;}
+  .dot{width:10px; height:10px; border-radius:50%; display:inline-block;}
+
+  .source-item { display:flex; align-items:center; gap:8px; cursor:pointer; font-size:12px; }
+  .source-item input { accent-color:var(--accent); margin:0; }
+
+  #breadcrumb{font-size:13px; color:var(--muted); min-height:18px;}
+  #breadcrumb span{cursor:pointer; color:var(--text); font-weight:500;}
+  #breadcrumb span:hover{text-decoration:underline;}
+  #breadcrumb .sep{color:var(--muted); margin:0 6px; cursor:default;}
+
+  #canvas-wrap{background:var(--panel); border:1px solid var(--line); border-radius:12px; overflow:hidden; flex-grow:1; position:relative;}
+  svg{display:block; width:100%; height:100%; cursor:grab;}
+
+  .node circle{stroke-width:1.5px; cursor:pointer; transition: r 0.4s, fill 0.4s, stroke-opacity 0.4s;}
+  .node text{font-weight:500; fill:var(--text); pointer-events:none; transition: font-size 0.4s, fill-opacity 0.4s;}
+  .node text.gloss{font-weight:400; fill:var(--muted); font-size:11px;}
+  
+  .edge{stroke-width:1.2px; fill:none; transition: stroke-opacity 0.4s, stroke 0.4s;}
+  .edge.horizontal{stroke-dasharray:3,3; stroke-width:1.5px;}
+  .edge.vertical{stroke-dasharray:none;}
+  .edge.lineage{stroke-dasharray:none; stroke-width:2px;}
+  .edge.tree-branch{stroke-width:2.5px; stroke-dasharray:none;}
+
+  #empty-state{position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); color:var(--muted); font-size:13px;}
 </style>
 </head>
 <body>
 <div id="container">
   <div id="sidebar">
-    <h1>Workspace</h1>
-    <button id="loadSample">Load Sample Dataset</button>
+    <div>
+      <h1>CSV layer graph</h1>
+      <div class="sub">Semantic zoom & etymological tree workspace.</div>
+    </div>
+
+    <div class="field">
+      <label>Nodes CSV (id, label, layer, layer_name)</label>
+      <input type="file" id="nodesFile" accept=".csv">
+    </div>
+    <div class="field">
+      <label>Edges CSV (source, target, type, sources)</label>
+      <input type="file" id="edgesFile" accept=".csv">
+    </div>
+
+    <button id="loadSample">⚡ Load Sample Dataset</button>
+
+    <div class="slider-wrap">
+      <div><label for="densitySlider">Edge Density Limit (Overview Only)</label><span id="densityVal">30%</span></div>
+      <input type="range" id="densitySlider" min="10" max="100" value="30">
+    </div>
+
+    <hr style="border:0; border-top:1px solid var(--line); margin:4px 0;">
+
+    <div>
+      <h2>Layers</h2>
+      <div id="legend"></div>
+    </div>
+
+    <div>
+      <h2>Filter by Sources</h2>
+      <div id="source-filters"></div>
+    </div>
+
+    <div style="margin-top:auto; display:flex; flex-direction:column; gap:8px;">
+      <button class="ghost" id="resetView">Reset Zoom View</button>
+    </div>
   </div>
-  <div id="canvas-wrap"><svg id="viz"></svg></div>
+
+  <div id="main-content">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <div id="breadcrumb"></div>
+      <div id="status"></div>
+    </div>
+
+    <div id="canvas-wrap">
+      <div id="empty-state">Upload pipeline data files, or click "Load Sample Dataset".</div>
+      <svg id="viz" style="display:none;"></svg>
+    </div>
+  </div>
 </div>
 
 <script>
-let selectedInspectedNodeId = null;
-let nodes = [], links = [];
-let sim, svg, g, linkSel, nodeSel;
+const COLOR_PALETTE = ["#8b7fe8","#3fc9a0","#e88a6a","#e8b83f","#5fa8e8","#d46fc9","#7fbf5f","#e85f7f"];
 
-// Mapping projection: Perspective (Overview) vs Linear (Tree)
-function project(node) {
-  if (selectedInspectedNodeId && node.treeX !== undefined) {
-    return { x: node.treeX, y: node.treeY };
-  }
-  const centerX = 900/2, centerY = 600/2;
-  const depthDelta = node.layerIndex - (window.focusIndex || 0);
-  const zScale = Math.pow(0.5, Math.abs(depthDelta));
-  return { 
-    x: centerX + (node.x - centerX) * zScale, 
-    y: centerY + (node.y - centerY) * zScale 
-  };
+const SOURCE_COLORS = {
+  "LIV": "#3fc9a0",
+  "Pokorny": "#e88a6a",
+  "Consensus": "#5fa8e8",
+  "Shared": "#535866"
+};
+
+const SOURCE_NORMALIZATION_MAP = {
+  "pokorny": "Pokorny",
+  "picorni": "Pokorny",
+  "pokorny;": "Pokorny",
+  "liv": "LIV",
+  "liv;": "LIV",
+  "consensus": "Consensus"
+};
+
+const SAMPLE_NODES_CSV =
+`id,label,layer,layer_name
+lang_pie,Proto-Indo-European,1,Languages
+lang_latin,Latin,1,Languages
+lang_french,French,1,Languages
+lang_spanish,Spanish,1,Languages
+lang_italian,Italian,1,Languages
+lang_portuguese,Portuguese,1,Languages
+w_pie_ap,*h₂ep- (water),2,Words
+w_pie_te,*ters- (dry),2,Words
+w_aqua,aqua,2,Words
+w_eau,eau,2,Words
+w_agua,agua,2,Words
+w_acqua,acqua,2,Words
+w_agua_pt,água,2,Words
+w_terra,terra,2,Words
+w_terre,terre,2,Words
+w_tierra,tierra,2,Words
+w_terra_it,terra,2,Words
+w_terra_pt,terra,2,Words
+w_normal,normal,2,Words
+w_normalize,normalize,2,Words
+d_water,"clear liquid, H2O",3,Definitions
+d_baptism,ritual purification,3,Definitions
+d_land,solid ground / earth,3,Definitions
+d_territory,region under control,3,Definitions`;
+
+const SAMPLE_EDGES_CSV =
+`source,target,type,sources
+lang_pie,lang_latin,DEVELOPED_INTO,LIV;Pokorny
+lang_latin,lang_french,DEVELOPED_INTO,LIV
+lang_latin,lang_spanish,DEVELOPED_INTO,LIV;Pokorny
+lang_latin,lang_italian,DEVELOPED_INTO,Pokorny
+lang_latin,lang_portuguese,DEVELOPED_INTO,LIV
+w_pie_ap,lang_pie,BELONGS_TO,Pokorny
+w_pie_te,lang_pie,BELONGS_TO,Pokorny
+w_aqua,lang_latin,BELONGS_TO,LIV;Pokorny
+w_eau,lang_french,BELONGS_TO,LIV
+w_agua,lang_spanish,BELONGS_TO,Pokorny
+w_acqua,italian,BELONGS_TO,Pokorny
+w_agua_pt,lang_portuguese,BELONGS_TO,LIV
+w_terra,lang_latin,BELONGS_TO,Pokorny;LIV
+w_terre,lang_french,BELONGS_TO,Pokorny
+w_tierra,lang_spanish,BELONGS_TO,LIV
+w_terra_it,lang_italian,BELONGS_TO,Pokorny
+w_terra_pt,lang_portuguese,BELONGS_TO,Pokorny
+w_aqua,w_pie_ap,DERIVED_FROM,Pokorny
+w_eau,w_aqua,DERIVED_FROM,LIV
+w_agua,w_aqua,DERIVED_FROM,LIV
+w_acqua,w_aqua,DERIVED_FROM,Pokorny
+w_agua_pt,w_aqua,DERIVED_FROM,LIV
+w_terra,w_pie_te,DERIVED_FROM,Pokorny
+w_terre,w_terra,DERIVED_FROM,Pokorny
+w_tierra,w_terra,DERIVED_FROM,LIV
+w_terra_it,w_terra,DERIVED_FROM,Pokorny
+w_terra_pt,w_terra,DERIVED_FROM,Pokorny
+w_normal,lang_french,BELONGS_TO,Consensus
+w_normalize,lang_french,BELONGS_TO,Consensus
+w_normal,w_normalize,MORPH_DERIVED,Consensus
+w_aqua,d_water,HAS_MEANING,LIV;Pokorny
+w_eau,d_water,HAS_MEANING,LIV
+w_agua,d_water,HAS_MEANING,Pokorny
+w_acqua,d_water,HAS_MEANING,Pokorny
+w_agua_pt,d_water,HAS_MEANING,LIV
+w_aqua,d_baptism,HAS_MEANING,Pokorny
+w_terra,d_land,HAS_MEANING,Pokorny
+w_terre,d_land,HAS_MEANING,Pokorny
+w_tierra,d_land,HAS_MEANING,LIV
+w_terra_it,d_land,HAS_MEANING,Pokorny
+w_terra_it,d_territory,HAS_MEANING,Pokorny;LIV
+w_terra_pt,d_land,HAS_MEANING,Pokorny
+d_baptism,d_water,SYNONYM_OF,Pokorny
+d_territory,d_land,SYNONYM_OF,LIV`;
+
+let rawNodeRows = null, rawEdgeRows = null;
+let selectedSources = new Set();
+let densityThreshold = 0.3;
+
+function setStatus(msg, kind){
+  const el = document.getElementById("status");
+  el.textContent = msg; el.className = kind || "";
 }
 
-// Tick function logic with safe pathing
-function tick() {
-  linkSel.attr("d", d => {
-    const sP = project(d.source);
-    const tP = project(d.target);
-    if (selectedInspectedNodeId) {
-      return `M${sP.x},${sP.y} L${tP.x},${tP.y}`;
+function parseFile(file, cb){
+  Papa.parse(file, {header:true, dynamicTyping:true, skipEmptyLines:true, complete: r => cb(r.data)});
+}
+
+function normalizeSourceToken(token) {
+  if (!token) return null;
+  const clean = token.trim().toLowerCase();
+  return SOURCE_NORMALIZATION_MAP[clean] || token.trim(); 
+}
+
+document.getElementById("nodesFile").addEventListener("change", e => {
+  if (!e.target.files[0]) return;
+  parseFile(e.target.files[0], data => { rawNodeRows = data; tryBuild(); });
+});
+document.getElementById("edgesFile").addEventListener("change", e => {
+  if (!e.target.files[0]) return;
+  parseFile(e.target.files[0], data => { rawEdgeRows = data; updateSourceFilters(); tryBuild(); });
+});
+document.getElementById("loadSample").addEventListener("click", () => {
+  Papa.parse(SAMPLE_NODES_CSV, {header:true, dynamicTyping:true, skipEmptyLines:true, complete: r => { rawNodeRows = r.data; tryBuild(); }});
+  Papa.parse(SAMPLE_EDGES_CSV, {header:true, dynamicTyping:true, skipEmptyLines:true, complete: r => { rawEdgeRows = r.data; updateSourceFilters(); tryBuild(); }});
+});
+
+document.getElementById("densitySlider").addEventListener("input", e => {
+  densityThreshold = e.target.value / 100;
+  document.getElementById("densityVal").textContent = e.target.value + "%";
+  if(rawNodeRows && rawEdgeRows) render();
+});
+
+function updateSourceFilters() {
+  if (!rawEdgeRows) return;
+  const foundSources = new Set();
+  
+  rawEdgeRows.forEach(r => {
+    if (r.sources) {
+      String(r.sources).split(';').forEach(s => {
+        const normalized = normalizeSourceToken(s);
+        if (normalized) foundSources.add(normalized);
+      });
     }
-    const cx = (sP.x + tP.x) / 2;
-    const cy = Math.min(sP.y, tP.y) - 30;
-    return `M${sP.x},${sP.y} Q${cx},${cy} ${tP.x},${tP.y}`;
   });
 
-  nodeSel.attr("transform", d => {
-    const p = project(d);
-    return `translate(${p.x},${p.y})`;
+  selectedSources = new Set(foundSources); 
+  const container = document.getElementById("source-filters");
+  container.innerHTML = "";
+
+  const allLabel = document.createElement("label");
+  allLabel.className = "source-item";
+  allLabel.innerHTML = `<input type="checkbox" id="source-all" checked> <strong>Show All Sources</strong>`;
+  container.appendChild(allLabel);
+
+  foundSources.forEach(src => {
+    const color = SOURCE_COLORS[src] || "var(--muted)";
+    const lbl = document.createElement("label");
+    lbl.className = "source-item";
+    lbl.innerHTML = `<input type="checkbox" class="src-chk" data-src="${src}" checked> 
+                     <span class="dot" style="background:${color}; width:8px; height:8px;"></span> ${src}`;
+    container.appendChild(lbl);
+  });
+
+  document.getElementById("source-all").addEventListener("change", e => {
+    const chks = container.querySelectorAll(".src-chk");
+    chks.forEach(c => { c.checked = e.target.checked; if(e.target.checked) selectedSources.add(c.dataset.src); else selectedSources.delete(c.dataset.src); });
+    tryBuild();
+  });
+
+  container.querySelectorAll(".src-chk").forEach(chk => {
+    chk.addEventListener("change", e => {
+      if(e.target.checked) selectedSources.add(e.target.dataset.src);
+      else { selectedSources.delete(e.target.dataset.src); document.getElementById("source-all").checked = false; }
+      tryBuild();
+    });
   });
 }
 
-// Click handler to toggle simulation state
-function handleNodeClick(e, d) {
-  e.stopPropagation();
-  if (selectedInspectedNodeId === d.id) {
-    selectedInspectedNodeId = null;
-    sim.alpha(0.3).restart(); // Wake physics up
-  } else {
-    selectedInspectedNodeId = d.id;
-    sim.stop(); // Freeze physics
+function tryBuild(){
+  if (!rawNodeRows || !rawEdgeRows) return;
+  try{ buildAndRender(rawNodeRows, rawEdgeRows); } catch(err){ setStatus("Error: " + err.message, "error"); }
+}
+
+let sim, svg, g, linkSel, nodeSel, width, height, nodeById, verticalChildren, verticalParents;
+let horizontalSynchronicNeighbors, diachronicAncestors, diachronicDescendants, selectedInspectedNodeId;
+let layerColor, layerBandY;
+let focusIndex = 0, activeParentId = null;
+let activeAncestors = new Set();
+let numLayers = 0;
+
+function projectTo3D(node) {
+  if (selectedInspectedNodeId && node.treeX !== undefined) {
+    return { x: node.treeX, y: node.treeY, zScale: 1.0 };
   }
+  const centerX = width / 2;
+  const centerY = height / 2;
+  let depthDelta = node.layerIndex - focusIndex;
+  let zScale = 1.0;
+  if (depthDelta < 0) {
+    zScale = Math.pow(0.45, Math.abs(depthDelta));
+  } else if (depthDelta > 0) {
+    zScale = Math.pow(1.6, depthDelta);
+  }
+  return { x: centerX + (node.x - centerX) * zScale, y: centerY + (node.y - centerY) * zScale, zScale: zScale };
+}
+
+function getEdgeColor(sourcesList, sourceLayerIndex) {
+  if (!sourcesList || sourcesList.length === 0) return COLOR_PALETTE[sourceLayerIndex] || "#666";
+  if (sourcesList.length > 1) return SOURCE_COLORS.Shared;
+  return SOURCE_COLORS[sourcesList[0]] || SOURCE_COLORS.Shared;
+}
+
+function buildAndRender(nodeRows, edgeRows){
+  document.getElementById("empty-state").style.display = "none";
+  const svgEl = document.getElementById("viz");
+  svgEl.style.display = "block"; svgEl.innerHTML = "";
+
+  selectedInspectedNodeId = null; 
+  const nodes = [];
+  nodeRows.forEach(r => {
+    if (r.id === undefined || r.id === null || r.id === "" || r.layer === undefined || r.layer === null || r.layer === "") return;
+    nodes.push({
+      id: String(r.id),
+      label: r.label !== undefined && r.label !== null && r.label !== "" ? String(r.label) : String(r.id),
+      layer: Number(r.layer),
+      layerName: r.layer_name ? String(r.layer_name) : null
+    });
+  });
+  if (nodes.length === 0) throw new Error("No valid rows found in nodes CSV.");
+
+  nodeById = new Map(nodes.map(n => [n.id, n]));
+  const layerValues = [...new Set(nodes.map(n => n.layer))].sort((a,b)=>a-b);
+  numLayers = layerValues.length;
+  const layerValueToIndex = new Map(layerValues.map((v,i) => [v,i]));
+  layerColor = layerValues.map((v,i) => COLOR_PALETTE[i % COLOR_PALETTE.length]);
+
+  const layerLabel = layerValues.map(v => {
+    const match = nodes.find(n => n.layer === v && n.layerName);
+    return match ? match.layerName : ("Layer " + v);
+  });
+  nodes.forEach(n => n.layerIndex = layerValueToIndex.get(n.layer));
+
+  layerBandY = new Map();
+  layerValues.forEach((v,i) => layerBandY.set(i, 80 + i * (490 / Math.max(numLayers-1,1))));
+
+  verticalChildren = new Map(nodes.map(n => [n.id, new Set()]));
+  verticalParents = new Map(nodes.map(n => [n.id, new Set()]));
+  horizontalSynchronicNeighbors = new Map(nodes.map(n => [n.id, new Set()]));
+  diachronicAncestors = new Map(nodes.map(n => [n.id, new Set()]));
+  diachronicDescendants = new Map(nodes.map(n => [n.id, new Set()]));
+  
+  const links = [];
+
+  edgeRows.forEach((r) => {
+    const s = r.source !== undefined ? String(r.source) : "";
+    const t = r.target !== undefined ? String(r.target) : "";
+    if (!s || !t || !nodeById.has(s) || !nodeById.has(t)) return;
+
+    const edgeSrcs = r.sources 
+      ? Array.from(new Set(String(r.sources).split(';').map(normalizeSourceToken).filter(Boolean)))
+      : [];
+      
+    if (edgeSrcs.length > 0 && selectedSources.size > 0) {
+      const hasMatch = edgeSrcs.some(src => selectedSources.has(src));
+      if (!hasMatch) return;
+    }
+
+    const sNode = nodeById.get(s), tNode = nodeById.get(t);
+    const kind = sNode.layerIndex === tNode.layerIndex ? "horizontal" : "vertical";
+
+    links.push({
+      source:s, target:t, 
+      type:r.type || "", 
+      kind, 
+      sourcesList: edgeSrcs, 
+      weight: edgeSrcs.length || 1,
+      isSynchronicMorph: r.type === "MORPH_DERIVED"
+    });
+
+    if (kind === "vertical") {
+      const [parent, child] = sNode.layerIndex < tNode.layerIndex ? [sNode, tNode] : [tNode, sNode];
+      verticalChildren.get(parent.id).add(child.id);
+      verticalParents.get(child.id).add(parent.id);
+    } else if (kind === "horizontal") {
+      if (r.type === "MORPH_DERIVED") {
+        horizontalSynchronicNeighbors.get(s).add(t);
+        horizontalSynchronicNeighbors.get(t).add(s);
+      } else if (r.type === "DERIVED_FROM") {
+        diachronicAncestors.get(s).add(t);
+        diachronicDescendants.get(t).add(s);
+      }
+    }
+  });
+
+  const rankedByWeight = [...links].sort((a,b) => b.weight - a.weight);
+  rankedByWeight.forEach((l, i) => l.densityRank = i);
+
+  const legend = document.getElementById("legend");
+  legend.innerHTML = "";
+  layerValues.forEach((v,i) => {
+    legend.innerHTML += `<div class="chip"><span class="dot" style="background:${layerColor[i]}"></span>${layerLabel[i]}</div>`;
+  });
+
+  const adjacency = new Map(nodes.map(n => [n.id, new Set()]));
+  links.forEach(l => { adjacency.get(l.source).add(l.target); adjacency.get(l.target).add(l.source); });
+
+  width = 900; height = 600;
+  svg = d3.select("#viz").attr("viewBox", [0,0,width,height]);
+
+  svg.append("defs").append("marker")
+    .attr("id", "arrow-lineage")
+    .attr("viewBox", "0 0 10 10").attr("refX", 12).attr("refY", 5)
+    .attr("markerWidth", 6).attr("markerHeight", 6).attr("orient", "auto-start-reverse")
+    .append("path").attr("d", "M0,0L10,5L0,10Z").attr("fill", "var(--accent)");
+
+  g = svg.append("g");
+  svg.call(d3.zoom().scaleExtent([0.3,4]).on("zoom", e => g.attr("transform", e.transform)));
+
+  linkSel = g.append("g").selectAll("path")
+    .data(links).join("path")
+    .attr("class", d => "edge " + d.kind + (d.type === "DEVELOPED_INTO" || d.type === "DERIVED_FROM" ? " lineage" : ""))
+    .attr("stroke", d => getEdgeColor(d.sourcesList, nodeById.get(d.source).layerIndex))
+    .attr("marker-end", d => (d.type === "DEVELOPED_INTO" || d.type === "DERIVED_FROM") ? "url(#arrow-lineage)" : null);
+
+  nodeSel = g.append("g").selectAll("g")
+    .data(nodes).join("g")
+    .attr("class", "node")
+    .call(d3.drag()
+      .on("start", (e,d) => { if(!selectedInspectedNodeId && !e.active) sim.alphaTarget(0.2).restart(); d.fx=d.x; d.fy=d.y; })
+      .on("drag", (e,d) => { d.fx=e.x; d.fy=e.y; })
+      .on("end", (e,d) => { if(!e.active) sim.alphaTarget(0); d.fx=null; d.fy=null; }));
+
+  nodeSel.append("circle");
+  
+  nodeSel.append("text")
+    .attr("class", "label-main")
+    .attr("text-anchor", "middle")
+    .attr("dominant-baseline", "central")
+    .text(d => d.label);
+
+  nodeSel.append("text")
+    .attr("class", "gloss")
+    .attr("text-anchor", "middle")
+    .attr("dy", "16px")
+    .text("");
+
+  // --- OVERHAULED CLICK INTERACTION HANDLER ---
+  nodeSel.on("click", (e,d) => {
+    e.stopPropagation();
+    
+    // Rule: Clicking ANY node in the word layer (Layer Index 1) ALWAYS activates or toggles the tree view instantly
+    if (d.layerIndex === 1) {
+      if (selectedInspectedNodeId === d.id) {
+        selectedInspectedNodeId = null; // Toggle off if clicking the same node again
+      } else {
+        selectedInspectedNodeId = d.id; // Focus layout directly onto this word's line
+        focusIndex = 1; // Sync breadcrumbs back to the word view level automatically
+      }
+      render();
+    } 
+    // Fallback: Default hierarchical workspace exploration clicks for non-word layers
+    else if (d.layerIndex === focusIndex) {
+      // Allow toggling for definitions if needed
+      if (d.layerIndex === 2) {
+        selectedInspectedNodeId = (selectedInspectedNodeId === d.id) ? null : d.id;
+        render();
+      }
+    } else if (d.layerIndex < numLayers - 1) {
+      focusIndex = d.layerIndex + 1; 
+      activeParentId = d.id;
+      selectedInspectedNodeId = null; 
+      calculateAncestry(); 
+      render();
+    }
+  });
+  
+  nodeSel.on("mouseenter", (e,d) => { if(!selectedInspectedNodeId) highlight(d.id, adjacency); });
+  nodeSel.on("mouseleave", () => { if(!selectedInspectedNodeId) highlight(null, adjacency); });
+
+  const resetAll = () => { focusIndex = 0; activeParentId = null; selectedInspectedNodeId = null; activeAncestors.clear(); render(); };
+  svg.on("click", resetAll);
+  document.getElementById("resetView").onclick = resetAll;
+
+  sim = d3.forceSimulation(nodes)
+    .force("link", d3.forceLink(links).id(d => d.id)
+      .distance(d => d.kind === "vertical" ? 140 : 90)
+      .strength(d => selectedInspectedNodeId ? 0 : 0.5))
+    .force("charge", d3.forceManyBody().strength(-240))
+    .force("x", d3.forceX(width / 2).strength(0.04))
+    .force("y", d3.forceY(d => layerBandY.get(d.layerIndex)).strength(0.85))
+    .force("collide", d3.forceCollide().radius(38))
+    .on("tick", () => {
+      linkSel.attr("d", d => {
+        const sP = projectTo3D(d.source);
+        const tP = projectTo3D(d.target);
+        
+        if (selectedInspectedNodeId && (d.type === "DERIVED_FROM" || d.kind === "vertical" || d.type === "HAS_MEANING")) {
+          const dx = tP.x - sP.x;
+          return `M${sP.x},${sP.y} C${sP.x + dx / 2},${sP.y} ${sP.x + dx / 2},${tP.y} ${tP.x},${tP.y}`;
+        }
+        
+        if (d.type === "DEVELOPED_INTO" || d.type === "DERIVED_FROM") {
+          const cx = (sP.x + tP.x) / 2;
+          const cy = Math.min(sP.y, tP.y) - 25 * Math.min(sP.zScale, tP.zScale);
+          return `M${sP.x},${sP.y} Q${cx},${cy} ${tP.x},${tP.y}`;
+        }
+        return `M${sP.x},${sP.y} L${tP.x},${tP.y}`;
+      });
+
+      nodeSel.attr("transform", d => {
+        const p = projectTo3D(d);
+        return `translate(${p.x},${p.y})`;
+      });
+    });
+
+  window.__layerLabel = layerLabel;
+  setStatus(`Loaded ${nodes.length} nodes, ${links.length} structural connections active.`, "ok");
   render();
 }
 
-// Placeholder for your existing render/setup logic
-function render() {
-  if (nodeSel) {
-    nodeSel.attr("transform", d => {
-      const p = project(d);
-      return `translate(${p.x},${p.y})`;
+function calculateAncestry() {
+  activeAncestors.clear();
+  if (!activeParentId) return;
+  let queue = [activeParentId];
+  while(queue.length > 0) {
+    let curr = queue.shift(); activeAncestors.add(curr);
+    let parents = verticalParents.get(curr);
+    if (parents) parents.forEach(p => { if(!activeAncestors.has(p)) queue.push(p); });
+  }
+}
+
+function highlight(hoverId, adjacency){
+  if (hoverId === null){
+    nodeSel.select("circle").attr("stroke-width", 1.5);
+    linkSel.style("stroke-opacity", null);
+    return;
+  }
+  const connected = adjacency.get(hoverId);
+  nodeSel.select("circle").attr("stroke-width", d => (d.id===hoverId || connected.has(d.id)) ? 3 : 1.5);
+  linkSel.style("stroke-opacity", d => (d.source.id===hoverId || d.target.id===hoverId || d.source===hoverId || d.target===hoverId) ? 1 : 0.1);
+}
+
+function getDiachronicWordAncestors(nodeId, results = new Set()) {
+  const parents = diachronicAncestors.get(nodeId);
+  if (parents) {
+    parents.forEach(pId => {
+      if (!results.has(pId)) { results.add(pId); getDiachronicWordAncestors(pId, results); }
     });
-    linkSel.attr("d", d => {
-        const sP = project(d.source);
-        const tP = project(d.target);
-        return selectedInspectedNodeId ? `M${sP.x},${sP.y} L${tP.x},${tP.y}` : `M${sP.x},${sP.y} Q${(sP.x+tP.x)/2},${Math.min(sP.y,tP.y)-30} ${tP.x},${tP.y}`;
+  }
+  return results;
+}
+
+function getDiachronicWordDescendants(nodeId, results = new Set()) {
+  const kids = diachronicDescendants.get(nodeId);
+  if (kids) {
+    kids.forEach(kId => {
+      if (!results.has(kId)) { results.add(kId); getDiachronicWordDescendants(kId, results); }
     });
+  }
+  return results;
+}
+
+function computeTreeLayoutPositions(targetId, relatives, definitions) {
+  const rootAncestors = Array.from(getDiachronicWordAncestors(targetId)).filter(id => nodeById.has(id));
+  const descendants = Array.from(getDiachronicWordDescendants(targetId)).filter(id => nodeById.has(id));
+  
+  let roots = rootAncestors.filter(id => diachronicAncestors.get(id).size === 0);
+  if (roots.length === 0 && nodeById.has(targetId) && diachronicAncestors.get(targetId).size === 0) {
+    roots = [targetId];
+  }
+
+  nodeById.forEach(n => { n.treeX = undefined; n.treeY = undefined; });
+
+  const lanes = [[], [], [], []];
+
+  roots.forEach(rId => lanes[0].push(rId));
+  rootAncestors.forEach(id => { if(!lanes[0].includes(id)) lanes[1].push(id); });
+  
+  if (!lanes[0].includes(targetId) && !lanes[1].includes(targetId)) {
+    if (lanes[0].length === 0) lanes[0].push(targetId); else lanes[2].push(targetId);
+  }
+  descendants.forEach(id => { if(!lanes[0].includes(id) && !lanes[1].includes(id) && !lanes[2].includes(id)) lanes[2].push(id); });
+  definitions.forEach(id => lanes[3].push(id));
+
+  if (lanes[1].length === 0 && lanes[2].length > 0) {
+    lanes[1] = lanes[2]; lanes[2] = [];
+  }
+
+  const laneXPositions = [140, 360, 580, 800];
+
+  lanes.forEach((laneNodes, laneIdx) => {
+    const total = laneNodes.length;
+    laneNodes.forEach((id, itemIdx) => {
+      const node = nodeById.get(id);
+      if (!node) return;
+      node.treeX = laneXPositions[laneIdx];
+      node.treeY = total === 1 ? height / 2 : 120 + itemIdx * ((height - 240) / (total - 1));
+    });
+  });
+
+  relatives.forEach(wordId => {
+    const wordNode = nodeById.get(wordId);
+    const parentLangIds = verticalParents.get(wordId);
+    if (wordNode && parentLangIds) {
+      parentLangIds.forEach(langId => {
+        const langNode = nodeById.get(langId);
+        if (langNode) {
+          langNode.treeX = wordNode.treeX;
+          langNode.treeY = wordNode.treeY - 45; 
+        }
+      });
+    }
+  });
+}
+
+function render(){
+  const activeChildren = activeParentId ? verticalChildren.get(activeParentId) : null;
+  const synchronicNeighbors = selectedInspectedNodeId ? horizontalSynchronicNeighbors.get(selectedInspectedNodeId) : null;
+  
+  const diachronicWordRelatives = new Set();
+  if (selectedInspectedNodeId) {
+    getDiachronicWordAncestors(selectedInspectedNodeId, diachronicWordRelatives);
+    getDiachronicWordDescendants(selectedInspectedNodeId, diachronicWordRelatives);
+    diachronicWordRelatives.add(selectedInspectedNodeId);
+  }
+
+  const visibleDownstreamDefinitions = new Set();
+  const collectDefs = (wordId) => {
+    const subKids = verticalChildren.get(wordId);
+    if (subKids) subKids.forEach(defId => visibleDownstreamDefinitions.add(defId));
+  };
+
+  if (selectedInspectedNodeId) {
+    diachronicWordRelatives.forEach(collectDefs);
+    if (synchronicNeighbors) synchronicNeighbors.forEach(collectDefs);
+    computeTreeLayoutPositions(selectedInspectedNodeId, diachronicWordRelatives, visibleDownstreamDefinitions);
+  } else {
+    nodeById.forEach(n => { n.treeX = undefined; n.treeY = undefined; });
+    if (activeChildren) {
+      activeChildren.forEach(childId => {
+        const subKids = verticalChildren.get(childId);
+        if (subKids) subKids.forEach(defId => visibleDownstreamDefinitions.add(defId));
+      });
+    }
+  }
+
+  const totalEdges = linkSel.size();
+  const maxAllowedRank = Math.ceil(totalEdges * densityThreshold) - 1;
+
+  if (sim) sim.alpha(0.2).restart();
+
+  nodeSel.each(function(d) {
+    const el = d3.select(this);
+    let dist = d.layerIndex - focusIndex;
+    let scaleFactor = 1.0; let opacityValue = 1.0;
+    let inlineGlossText = "";
+
+    if (selectedInspectedNodeId) {
+      const parentLangsOfActiveWords = new Set();
+      diachronicWordRelatives.forEach(wId => {
+        const parents = verticalParents.get(wId);
+        if (parents) parents.forEach(p => parentLangsOfActiveWords.add(p));
+      });
+
+      if (diachronicWordRelatives.has(d.id) || 
+          visibleDownstreamDefinitions.has(d.id) || 
+          parentLangsOfActiveWords.has(d.id) ||
+          (synchronicNeighbors && synchronicNeighbors.has(d.id))) {
+        
+        opacityValue = 1.0;
+        scaleFactor = d.layerIndex === 0 ? 0.75 : (d.id === selectedInspectedNodeId ? 1.2 : 1.0);
+        
+        if (d.layerIndex === 1) { 
+          const meanings = [];
+          const targets = verticalChildren.get(d.id);
+          if (targets) {
+            targets.forEach(tId => {
+              const targetNode = nodeById.get(tId);
+              if (targetNode && targetNode.layerIndex === 2) meanings.push(`"${targetNode.label}"`);
+            });
+          }
+          if (meanings.length > 0) inlineGlossText = meanings.join(", ");
+        }
+      } else {
+        opacityValue = 0.0;
+        scaleFactor = 0.0;
+      }
+    } else {
+      if (dist === 0) {
+        scaleFactor = 1.0; 
+        if (activeChildren) {
+          let isConnectedToVisibleChild = false;
+          activeChildren.forEach(childId => {
+            if (horizontalSynchronicNeighbors.get(childId) && horizontalSynchronicNeighbors.get(childId).has(d.id)) {
+              isConnectedToVisibleChild = true;
+            }
+          });
+          opacityValue = (activeChildren.has(d.id) || isConnectedToVisibleChild) ? 1.0 : 0.0;
+        } else {
+          opacityValue = 1.0;
+        }
+      } else if (dist < 0 && activeAncestors.has(d.id)) {
+        let depthSteps = Math.abs(dist);
+        scaleFactor = depthSteps === 1 ? 0.6 : 0.4; opacityValue = depthSteps === 1 ? 0.55 : 0.3;
+      } else if (dist > 0 && focusIndex === 1 && d.layerIndex === 2) {
+        if (visibleDownstreamDefinitions.has(d.id)) {
+          scaleFactor = 0.7; opacityValue = 0.4;
+        } else {
+          scaleFactor = 0.0; opacityValue = 0.0;
+        }
+      } else if (focusIndex === 0 && d.layerIndex === 1) {
+        scaleFactor = 0.7; opacityValue = 0.3;
+      } else {
+        scaleFactor = 0.0; opacityValue = 0.0;
+      }
+    }
+
+    let baseRadius = d.layerIndex === 0 ? 16 : 22;
+    const isInspected = d.id === selectedInspectedNodeId;
+    
+    el.select("circle")
+      .attr("r", baseRadius * scaleFactor * (isInspected ? 1.15 : 1.0))
+      .attr("fill", isInspected ? "var(--accent)" + "35" : (d.layerIndex === 0 ? "none" : layerColor[d.layerIndex] + (dist === 0 || selectedInspectedNodeId ? "35" : "10")))
+      .attr("stroke", isInspected ? "var(--accent)" : layerColor[d.layerIndex])
+      .style("stroke-width", isInspected ? "3px" : (d.layerIndex === 0 ? "1px" : "1.5px"))
+      .style("stroke-opacity", opacityValue);
+
+    el.select("text.label-main")
+      .attr("font-size", (selectedInspectedNodeId ? (d.id === selectedInspectedNodeId ? 14 : 11) : (dist === 0 ? 11 : 8)) + "px")
+      .style("fill-opacity", opacityValue)
+      .style("font-weight", d.layerIndex === 0 ? "400" : "600")
+      .style("fill", d.layerIndex === 0 ? "var(--muted)" : "var(--text)")
+      .style("display", scaleFactor === 0 ? "none" : "block");
+
+    el.select("text.gloss")
+      .text(inlineGlossText)
+      .style("fill-opacity", opacityValue)
+      .style("display", inlineGlossText === "" ? "none" : "block");
+
+    el.style("opacity", opacityValue).style("pointer-events", opacityValue > 0 ? "auto" : "none");
+  });
+
+  linkSel.style("opacity", (d) => {
+    if (!selectedInspectedNodeId && focusIndex === 0 && d.densityRank > maxAllowedRank) return 0.0;
+    
+    const sNode = nodeById.get(d.source.id || d.source);
+    const tNode = nodeById.get(d.target.id || d.target);
+
+    if (selectedInspectedNodeId) {
+      const hasMeaningLink = d.type === "HAS_MEANING" && (diachronicWordRelatives.has(sNode.id) || diachronicWordRelatives.has(tNode.id));
+      const hasDiachronicTreeLink = d.type === "DERIVED_FROM" && diachronicWordRelatives.has(sNode.id) && diachronicWordRelatives.has(tNode.id);
+      const hasLangTagLink = d.type === "BELONGS_TO" && diachronicWordRelatives.has(sNode.id || tNode.id);
+      
+      if (hasMeaningLink || hasDiachronicTreeLink || hasLangTagLink) return 0.85;
+      return 0.0;
+    }
+
+    if (d.isSynchronicMorph || d.type === "MORPH_DERIVED") {
+      if (sNode.layerIndex === focusIndex && tNode.layerIndex === focusIndex) {
+        return activeChildren ? ((activeChildren.has(sNode.id) || activeChildren.has(tNode.id)) ? 0.85 : 0.0) : 0.85;
+      }
+      return 0.0;
+    }
+
+    if (d.type === "DERIVED_FROM") {
+      if (sNode.layerIndex === focusIndex && tNode.layerIndex === focusIndex) {
+        return activeChildren ? ((activeChildren.has(sNode.id) || activeChildren.has(tNode.id)) ? 0.85 : 0.0) : 0.85;
+      }
+      return 0.0;
+    }
+
+    const sVisible = (sNode.layerIndex === focusIndex && (!activeChildren || activeChildren.has(sNode.id))) || activeAncestors.has(sNode.id) || (focusIndex === 0 && sNode.layerIndex === 1) || (focusIndex === 1 && sNode.layerIndex === 2 && visibleDownstreamDefinitions.has(sNode.id));
+    const tVisible = (tNode.layerIndex === focusIndex && (!activeChildren || activeChildren.has(tNode.id))) || activeAncestors.has(tNode.id) || (focusIndex === 0 && tNode.layerIndex === 1) || (focusIndex === 1 && tNode.layerIndex === 2 && visibleDownstreamDefinitions.has(tNode.id));
+
+    return (sVisible && tVisible) ? ((sNode.layerIndex === focusIndex && tNode.layerIndex === focusIndex) ? 0.85 : 0.25) : 0.0;
+  });
+
+  linkSel.attr("class", d => "edge " + d.kind + 
+    ((d.type === "DEVELOPED_INTO" || d.type === "DERIVED_FROM") ? " lineage" : "") + 
+    ((selectedInspectedNodeId && d.type === "DERIVED_FROM") ? " tree-branch" : ""));
+
+  renderBreadcrumb();
+}
+
+function renderBreadcrumb(){
+  const bc = document.getElementById("breadcrumb");
+  bc.innerHTML = "";
+  const labels = window.__layerLabel || [];
+  for (let i = 0; i <= focusIndex; i++){
+    const span = document.createElement("span");
+    span.textContent = labels[i] || ("Layer " + i);
+    span.onclick = () => {
+      focusIndex = i;
+      selectedInspectedNodeId = null;
+      if (i === 0) activeParentId = null;
+      else {
+        let targetId = null;
+        activeAncestors.forEach(id => { if (nodeById.get(id).layerIndex === i - 1) targetId = id; });
+        activeParentId = targetId;
+      }
+      calculateAncestry(); render();
+    };
+    bc.appendChild(span);
+    if (i < focusIndex) bc.innerHTML += `<span class="sep"> › </span>`;
   }
 }
 </script>
