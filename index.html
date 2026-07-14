@@ -127,7 +127,6 @@ const COLOR_PALETTE = ["#8b7fe8","#3fc9a0","#e88a6a","#e8b83f","#5fa8e8","#d46fc
 const SOURCE_COLORS = {
   "LIV": "#3fc9a0",
   "Pokorny": "#e88a6a",
-  "Picorni": "#e88a6a",
   "Consensus": "#5fa8e8",
   "Shared": "#535866"
 };
@@ -141,6 +140,7 @@ const SOURCE_NORMALIZATION_MAP = {
   "consensus": "Consensus"
 };
 
+// FIXED: Included w_normal and w_normalize directly in the default sample nodes CSV
 const SAMPLE_NODES_CSV =
 `id,label,layer,layer_name
 lang_latin,Latin,1,Languages
@@ -165,6 +165,7 @@ d_baptism,ritual purification,3,Definitions
 d_land,solid ground / earth,3,Definitions
 d_territory,region under control,3,Definitions`;
 
+// FIXED: Included Consensus relations for w_normal and w_normalize in the default sample edges CSV
 const SAMPLE_EDGES_CSV =
 `source,target,type,sources
 lang_latin,lang_french,DEVELOPED_INTO,LIV
@@ -531,88 +532,4 @@ function render(){
     if (dist === 0) {
       scaleFactor = 1.0; 
       if (activeChildren) {
-        if (activeChildren.has(d.id) || d.id === selectedInspectedNodeId || (synchronicNeighbors && synchronicNeighbors.has(d.id))) {
-          opacityValue = 1.0;
-        } else {
-          opacityValue = 0.0;
-        }
-      } else {
-        opacityValue = 1.0;
-      }
-    } else if (dist < 0 && activeAncestors.has(d.id)) {
-      let depthSteps = Math.abs(dist);
-      scaleFactor = depthSteps === 1 ? 0.6 : 0.4; opacityValue = depthSteps === 1 ? 0.55 : 0.3;
-    } else if (focusIndex === 0 && d.layerIndex === 1) {
-      scaleFactor = 0.7; opacityValue = 0.3;
-    } else {
-      scaleFactor = 0.0; opacityValue = 0.0;
-    }
-
-    let baseRadius = 24;
-    const isInspected = d.id === selectedInspectedNodeId;
-    
-    el.select("circle")
-      .attr("r", baseRadius * scaleFactor * (isInspected ? 1.15 : 1.0))
-      .attr("fill", isInspected ? "var(--accent)" + "25" : layerColor[d.layerIndex] + (dist === 0 ? "35" : "10"))
-      .attr("stroke", isInspected ? "var(--accent)" : layerColor[d.layerIndex])
-      .style("stroke-width", isInspected ? "3px" : "1.5px")
-      .style("stroke-opacity", opacityValue);
-
-    el.select("text")
-      .attr("font-size", (dist === 0 ? 11 : 8) + "px")
-      .style("fill-opacity", opacityValue)
-      .style("display", scaleFactor === 0 ? "none" : "block");
-
-    el.style("opacity", opacityValue).style("pointer-events", opacityValue > 0 ? "auto" : "none");
-  });
-
-  linkSel.style("opacity", (d) => {
-    if (focusIndex === 0 && d.densityRank > maxAllowedRank) return 0.0;
-    
-    const sNode = nodeById.get(d.source.id || d.source);
-    const tNode = nodeById.get(d.target.id || d.target);
-
-    if (d.isSynchronicMorph || d.type === "MORPH_DERIVED") {
-      if (selectedInspectedNodeId && (sNode.id === selectedInspectedNodeId || tNode.id === selectedInspectedNodeId)) {
-        return 0.9;
-      }
-      return 0.0;
-    }
-
-    const sVisible = (sNode.layerIndex === focusIndex && (!activeChildren || activeChildren.has(sNode.id) || sNode.id === selectedInspectedNodeId || (synchronicNeighbors && synchronicNeighbors.has(sNode.id)))) || activeAncestors.has(sNode.id) || (focusIndex === 0 && sNode.layerIndex === 1);
-    const tVisible = (tNode.layerIndex === focusIndex && (!activeChildren || activeChildren.has(tNode.id) || tNode.id === selectedInspectedNodeId || (synchronicNeighbors && synchronicNeighbors.has(tNode.id)))) || activeAncestors.has(tNode.id) || (focusIndex === 0 && tNode.layerIndex === 1);
-
-    if (sVisible && tVisible) {
-      return (sNode.layerIndex === focusIndex && tNode.layerIndex === focusIndex) ? 0.85 : 0.25;
-    }
-    return 0.0;
-  });
-
-  renderBreadcrumb();
-}
-
-function renderBreadcrumb(){
-  const bc = document.getElementById("breadcrumb");
-  bc.innerHTML = "";
-  const labels = window.__layerLabel || [];
-  for (let i = 0; i <= focusIndex; i++){
-    const span = document.createElement("span");
-    span.textContent = labels[i] || ("Layer " + i);
-    span.onclick = () => {
-      focusIndex = i;
-      selectedInspectedNodeId = null;
-      if (i === 0) activeParentId = null;
-      else {
-        let targetId = null;
-        activeAncestors.forEach(id => { if (nodeById.get(id).layerIndex === i - 1) targetId = id; });
-        activeParentId = targetId;
-      }
-      calculateAncestry(); render();
-    };
-    bc.appendChild(span);
-    if (i < focusIndex) bc.innerHTML += `<span class="sep"> › </span>`;
-  }
-}
-</script>
-</body>
-</html>
+        if (activeChildren.has(d.id) || d
