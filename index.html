@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>CSV Layer Graph — True Pseudo-3D Perspective</title>
+<title>CSV Layer Graph — Etymological Tree Workspace</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 <style>
@@ -58,11 +58,14 @@
   svg{display:block; width:100%; height:100%; cursor:grab;}
 
   .node circle{stroke-width:1.5px; cursor:pointer; transition: r 0.4s, fill 0.4s, stroke-opacity 0.4s;}
-  .node text{font-weight:500; fill:var(--text); pointer-events:none; text-anchor:middle; dominant-baseline:central; transition: font-size 0.4s, fill-opacity 0.4s;}
+  .node text{font-weight:500; fill:var(--text); pointer-events:none; transition: font-size 0.4s, fill-opacity 0.4s;}
+  .node text.gloss{font-weight:400; fill:var(--muted); font-size:10px;}
+  
   .edge{stroke-width:1.2px; fill:none; transition: stroke-opacity 0.4s, stroke 0.4s;}
   .edge.horizontal{stroke-dasharray:3,3; stroke-width:1.5px;}
   .edge.vertical{stroke-dasharray:none;}
   .edge.lineage{stroke-dasharray:none; stroke-width:2px;}
+  .edge.tree-branch{stroke-width:2.5px; stroke-dasharray:none;}
 
   #empty-state{position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); color:var(--muted); font-size:13px;}
 </style>
@@ -72,7 +75,7 @@
   <div id="sidebar">
     <div>
       <h1>CSV layer graph</h1>
-      <div class="sub">Semantic zoom & pseudo-3D perspective workspace.</div>
+      <div class="sub">Semantic zoom & etymological tree workspace.</div>
     </div>
 
     <div class="field">
@@ -87,7 +90,7 @@
     <button id="loadSample">⚡ Load Sample Dataset</button>
 
     <div class="slider-wrap">
-      <div><label for="densitySlider">Edge Density Limit (by citation count, overview only)</label><span id="densityVal">30%</span></div>
+      <div><label for="densitySlider">Edge Density Limit (Overview Only)</label><span id="densityVal">30%</span></div>
       <input type="range" id="densitySlider" min="10" max="100" value="30">
     </div>
 
@@ -140,7 +143,6 @@ const SOURCE_NORMALIZATION_MAP = {
   "consensus": "Consensus"
 };
 
-// Deep sample dataset featuring PIE -> Latin -> Romance derivations (3+ connected words)
 const SAMPLE_NODES_CSV =
 `id,label,layer,layer_name
 lang_pie,Proto-Indo-European,1,Languages
@@ -267,7 +269,6 @@ function updateSourceFilters() {
   });
 
   selectedSources = new Set(foundSources); 
-
   const container = document.getElementById("source-filters");
   container.innerHTML = "";
 
@@ -313,6 +314,10 @@ let activeAncestors = new Set();
 let numLayers = 0;
 
 function projectTo3D(node) {
+  // If tree view is active, use pinned layout coordinates
+  if (selectedInspectedNodeId && node.treeX !== undefined) {
+    return { x: node.treeX, y: node.treeY, zScale: 1.0 };
+  }
   const centerX = width / 2;
   const centerY = height / 2;
   let depthDelta = node.layerIndex - focusIndex;
@@ -337,7 +342,6 @@ function buildAndRender(nodeRows, edgeRows){
   svgEl.style.display = "block"; svgEl.innerHTML = "";
 
   selectedInspectedNodeId = null; 
-
   const nodes = [];
   nodeRows.forEach(r => {
     if (r.id === undefined || r.id === null || r.id === "" || r.layer === undefined || r.layer === null || r.layer === "") return;
@@ -363,7 +367,7 @@ function buildAndRender(nodeRows, edgeRows){
   nodes.forEach(n => n.layerIndex = layerValueToIndex.get(n.layer));
 
   layerBandY = new Map();
-  layerValues.forEach((v,i) => layerBandY.set(i, 70 + i * (510 / Math.max(numLayers-1,1))));
+  layerValues.forEach((v,i) => layerBandY.set(i, 80 + i * (490 / Math.max(numLayers-1,1))));
 
   verticalChildren = new Map(nodes.map(n => [n.id, new Set()]));
   verticalParents = new Map(nodes.map(n => [n.id, new Set()]));
@@ -426,17 +430,17 @@ function buildAndRender(nodeRows, edgeRows){
   const adjacency = new Map(nodes.map(n => [n.id, new Set()]));
   links.forEach(l => { adjacency.get(l.source).add(l.target); adjacency.get(l.target).add(l.source); });
 
-  width = 800; height = 650;
+  width = 900; height = 600;
   svg = d3.select("#viz").attr("viewBox", [0,0,width,height]);
 
   svg.append("defs").append("marker")
     .attr("id", "arrow-lineage")
-    .attr("viewBox", "0 0 10 10").attr("refX", 9).attr("refY", 5)
+    .attr("viewBox", "0 0 10 10").attr("refX", 12).attr("refY", 5)
     .attr("markerWidth", 6).attr("markerHeight", 6).attr("orient", "auto-start-reverse")
     .append("path").attr("d", "M0,0L10,5L0,10Z").attr("fill", "var(--accent)");
 
   g = svg.append("g");
-  svg.call(d3.zoom().scaleExtent([0.4,4]).on("zoom", e => g.attr("transform", e.transform)));
+  svg.call(d3.zoom().scaleExtent([0.3,4]).on("zoom", e => g.attr("transform", e.transform)));
 
   linkSel = g.append("g").selectAll("path")
     .data(links).join("path")
@@ -448,22 +452,30 @@ function buildAndRender(nodeRows, edgeRows){
     .data(nodes).join("g")
     .attr("class", "node")
     .call(d3.drag()
-      .on("start", (e,d) => { if(!e.active) sim.alphaTarget(0.2).restart(); d.fx=d.x; d.fy=d.y; })
+      .on("start", (e,d) => { if(!selectedInspectedNodeId && !e.active) sim.alphaTarget(0.2).restart(); d.fx=d.x; d.fy=d.y; })
       .on("drag", (e,d) => { d.fx=e.x; d.fy=e.y; })
       .on("end", (e,d) => { if(!e.active) sim.alphaTarget(0); d.fx=null; d.fy=null; }));
 
   nodeSel.append("circle");
-  nodeSel.append("text").text(d => d.label);
+  
+  // Main Label text
+  nodeSel.append("text")
+    .attr("class", "label-main")
+    .attr("text-anchor", "middle")
+    .attr("dominant-baseline", "central")
+    .text(d => d.label);
+
+  // Definition/Gloss subtitle text element
+  nodeSel.append("text")
+    .attr("class", "gloss")
+    .attr("text-anchor", "middle")
+    .attr("dy", "16px")
+    .text("");
 
   nodeSel.on("click", (e,d) => {
     e.stopPropagation();
-    
     if (d.layerIndex === focusIndex) {
-      if (selectedInspectedNodeId === d.id) {
-        selectedInspectedNodeId = null; 
-      } else {
-        selectedInspectedNodeId = d.id; 
-      }
+      selectedInspectedNodeId = (selectedInspectedNodeId === d.id) ? null : d.id; 
       render();
     } 
     else if (d.layerIndex < numLayers - 1) {
@@ -475,8 +487,8 @@ function buildAndRender(nodeRows, edgeRows){
     }
   });
   
-  nodeSel.on("mouseenter", (e,d) => highlight(d.id, adjacency));
-  nodeSel.on("mouseleave", () => highlight(null, adjacency));
+  nodeSel.on("mouseenter", (e,d) => { if(!selectedInspectedNodeId) highlight(d.id, adjacency); });
+  nodeSel.on("mouseleave", () => { if(!selectedInspectedNodeId) highlight(null, adjacency); });
 
   const resetAll = () => { focusIndex = 0; activeParentId = null; selectedInspectedNodeId = null; activeAncestors.clear(); render(); };
   svg.on("click", resetAll);
@@ -484,23 +496,31 @@ function buildAndRender(nodeRows, edgeRows){
 
   sim = d3.forceSimulation(nodes)
     .force("link", d3.forceLink(links).id(d => d.id)
-      .distance(d => d.kind === "vertical" ? 150 : (d.isSynchronicMorph || d.type === "DERIVED_FROM" ? 70 : 110))
-      .strength(d => d.kind === "vertical" ? 0.25 : 0.5))
-    .force("charge", d3.forceManyBody().strength(-220))
-    .force("x", d3.forceX(width / 2).strength(0.03))
-    .force("y", d3.forceY(d => layerBandY.get(d.layerIndex)).strength(0.8))
-    .force("collide", d3.forceCollide().radius(35))
+      .distance(d => d.kind === "vertical" ? 140 : 90)
+      .strength(d => selectedInspectedNodeId ? 0 : 0.5))
+    .force("charge", d3.forceManyBody().strength(-240))
+    .force("x", d3.forceX(width / 2).strength(0.04))
+    .force("y", d3.forceY(d => layerBandY.get(d.layerIndex)).strength(0.85))
+    .force("collide", d3.forceCollide().radius(38))
     .on("tick", () => {
       linkSel.attr("d", d => {
         const sP = projectTo3D(d.source);
         const tP = projectTo3D(d.target);
+        
+        // Beautiful elegant dendritic curve drawing if tree view mode is active
+        if (selectedInspectedNodeId && (d.type === "DERIVED_FROM" || d.kind === "vertical" || d.type === "HAS_MEANING")) {
+          const dx = tP.x - sP.x;
+          return `M${sP.x},${sP.y} C${sP.x + dx / 2},${sP.y} ${sP.x + dx / 2},${tP.y} ${tP.x},${tP.y}`;
+        }
+        
         if (d.type === "DEVELOPED_INTO" || d.type === "DERIVED_FROM") {
           const cx = (sP.x + tP.x) / 2;
-          const cy = Math.min(sP.y, tP.y) - 30 * Math.min(sP.zScale, tP.zScale);
+          const cy = Math.min(sP.y, tP.y) - 25 * Math.min(sP.zScale, tP.zScale);
           return `M${sP.x},${sP.y} Q${cx},${cy} ${tP.x},${tP.y}`;
         }
         return `M${sP.x},${sP.y} L${tP.x},${tP.y}`;
       });
+
       nodeSel.attr("transform", d => {
         const p = projectTo3D(d);
         return `translate(${p.x},${p.y})`;
@@ -538,10 +558,7 @@ function getDiachronicWordAncestors(nodeId, results = new Set()) {
   const parents = diachronicAncestors.get(nodeId);
   if (parents) {
     parents.forEach(pId => {
-      if (!results.has(pId)) {
-        results.add(pId);
-        getDiachronicWordAncestors(pId, results);
-      }
+      if (!results.has(pId)) { results.add(pId); getDiachronicWordAncestors(pId, results); }
     });
   }
   return results;
@@ -551,13 +568,71 @@ function getDiachronicWordDescendants(nodeId, results = new Set()) {
   const kids = diachronicDescendants.get(nodeId);
   if (kids) {
     kids.forEach(kId => {
-      if (!results.has(kId)) {
-        results.add(kId);
-        getDiachronicWordDescendants(kId, results);
-      }
+      if (!results.has(kId)) { results.add(kId); getDiachronicWordDescendants(kId, results); }
     });
   }
   return results;
+}
+
+function computeTreeLayoutPositions(targetId, relatives, definitions) {
+  // 1. Gather active lineage chain
+  const rootAncestors = Array.from(getDiachronicWordAncestors(targetId)).filter(id => nodeById.has(id));
+  const descendants = Array.from(getDiachronicWordDescendants(targetId)).filter(id => nodeById.has(id));
+  
+  // Arrange chronology bands from left to right
+  let roots = rootAncestors.filter(id => diachronicAncestors.get(id).size === 0);
+  if (roots.length === 0 && nodeById.has(targetId) && diachronicAncestors.get(targetId).size === 0) {
+    roots = [targetId];
+  }
+
+  // Clear older coordinates
+  nodeById.forEach(n => { n.treeX = undefined; n.treeY = undefined; });
+
+  // 2. Map structural stages horizontally
+  // Stage 1: Ancient Roots (PIE) -> Stage 2: Intermediate Core (Latin) -> Stage 3: Modern Offspring -> Stage 4: Definitions
+  const lanes = [[], [], [], []];
+
+  roots.forEach(rId => lanes[0].push(rId));
+  rootAncestors.forEach(id => { if(!lanes[0].includes(id)) lanes[1].push(id); });
+  
+  if (!lanes[0].includes(targetId) && !lanes[1].includes(targetId)) {
+    if (lanes[0].length === 0) lanes[0].push(targetId); else lanes[2].push(targetId);
+  }
+  descendants.forEach(id => { if(!lanes[0].includes(id) && !lanes[1].includes(id) && !lanes[2].includes(id)) lanes[2].push(id); });
+  definitions.forEach(id => lanes[3].push(id));
+
+  // If a lane is empty, shift item arrays gracefully to maintain layout parity
+  if (lanes[1].length === 0 && lanes[2].length > 0) {
+    lanes[1] = lanes[2]; lanes[2] = [];
+  }
+
+  const laneXPositions = [140, 360, 580, 800];
+
+  // 3. Stagger Y positions elegantly to construct the branches
+  lanes.forEach((laneNodes, laneIdx) => {
+    const total = laneNodes.length;
+    laneNodes.forEach((id, itemIdx) => {
+      const node = nodeById.get(id);
+      if (!node) return;
+      node.treeX = laneXPositions[laneIdx];
+      node.treeY = total === 1 ? height / 2 : 120 + itemIdx * ((height - 240) / (total - 1));
+    });
+  });
+
+  // 4. Anchor structural language header tags directly above their etymology column nodes
+  relatives.forEach(wordId => {
+    const wordNode = nodeById.get(wordId);
+    const parentLangIds = verticalParents.get(wordId);
+    if (wordNode && parentLangIds) {
+      parentLangIds.forEach(langId => {
+        const langNode = nodeById.get(langId);
+        if (langNode) {
+          langNode.treeX = wordNode.treeX;
+          langNode.treeY = wordNode.treeY - 45; // Float language directly over its word branch
+        }
+      });
+    }
+  });
 }
 
 function render(){
@@ -568,26 +643,29 @@ function render(){
   if (selectedInspectedNodeId) {
     getDiachronicWordAncestors(selectedInspectedNodeId, diachronicWordRelatives);
     getDiachronicWordDescendants(selectedInspectedNodeId, diachronicWordRelatives);
+    diachronicWordRelatives.add(selectedInspectedNodeId);
   }
 
   const visibleDownstreamDefinitions = new Set();
-  
   const collectDefs = (wordId) => {
     const subKids = verticalChildren.get(wordId);
     if (subKids) subKids.forEach(defId => visibleDownstreamDefinitions.add(defId));
   };
 
   if (selectedInspectedNodeId) {
-    // Isolated Mode: Collect definitions exclusively for the active tree nodes
-    collectDefs(selectedInspectedNodeId);
-    if (synchronicNeighbors) synchronicNeighbors.forEach(collectDefs);
     diachronicWordRelatives.forEach(collectDefs);
-  } else if (activeChildren) {
-    // Broad Mode: Collect definitions for all family children
-    activeChildren.forEach(childId => {
-      const subKids = verticalChildren.get(childId);
-      if (subKids) subKids.forEach(defId => visibleDownstreamDefinitions.add(defId));
-    });
+    if (synchronicNeighbors) synchronicNeighbors.forEach(collectDefs);
+    // Switch simulation over to Tree mode coordinate pinning
+    computeTreeLayoutPositions(selectedInspectedNodeId, diachronicWordRelatives, visibleDownstreamDefinitions);
+  } else {
+    // Standard layout mode: clear tree bindings
+    nodeById.forEach(n => { n.treeX = undefined; n.treeY = undefined; });
+    if (activeChildren) {
+      activeChildren.forEach(childId => {
+        const subKids = verticalChildren.get(childId);
+        if (subKids) subKids.forEach(defId => visibleDownstreamDefinitions.add(defId));
+      });
+    }
   }
 
   const totalEdges = linkSel.size();
@@ -599,115 +677,139 @@ function render(){
     const el = d3.select(this);
     let dist = d.layerIndex - focusIndex;
     let scaleFactor = 1.0; let opacityValue = 1.0;
+    let inlineGlossText = "";
 
-    if (dist === 0) {
-      scaleFactor = 1.0; 
-      
-      if (selectedInspectedNodeId) {
-        // ONLY reveal exact lineage mapping
-        if (d.id === selectedInspectedNodeId || 
-            (synchronicNeighbors && synchronicNeighbors.has(d.id)) ||
-            diachronicWordRelatives.has(d.id)) {
-          opacityValue = 1.0;
-        } else {
-          opacityValue = 0.0;
-        }
-      } else if (activeChildren) {
-        let isConnectedToVisibleChild = false;
-        activeChildren.forEach(childId => {
-          if (horizontalSynchronicNeighbors.get(childId) && horizontalSynchronicNeighbors.get(childId).has(d.id)) {
-            isConnectedToVisibleChild = true;
-          }
-        });
+    // Determine visibility conditions
+    if (selectedInspectedNodeId) {
+      // --- INTERACTIVE HORIZONTAL TREE MODE ACTIVATE ---
+      const parentLangsOfActiveWords = new Set();
+      diachronicWordRelatives.forEach(wId => {
+        const parents = verticalParents.get(wId);
+        if (parents) parents.forEach(p => parentLangsOfActiveWords.add(p));
+      });
 
-        if (activeChildren.has(d.id) || isConnectedToVisibleChild) {
-          opacityValue = 1.0;
-        } else {
-          opacityValue = 0.0;
-        }
-      } else {
+      if (diachronicWordRelatives.has(d.id) || 
+          visibleDownstreamDefinitions.has(d.id) || 
+          parentLangsOfActiveWords.has(d.id) ||
+          (synchronicNeighbors && synchronicNeighbors.has(d.id))) {
+        
         opacityValue = 1.0;
-      }
-    } else if (dist < 0 && activeAncestors.has(d.id)) {
-      let depthSteps = Math.abs(dist);
-      scaleFactor = depthSteps === 1 ? 0.6 : 0.4; opacityValue = depthSteps === 1 ? 0.55 : 0.3;
-    } else if (dist > 0 && focusIndex === 1 && d.layerIndex === 2) {
-      if (visibleDownstreamDefinitions.has(d.id)) {
-        scaleFactor = 0.7; 
-        opacityValue = 0.4;
+        scaleFactor = d.layerIndex === 0 ? 0.75 : (d.id === selectedInspectedNodeId ? 1.2 : 1.0);
+        
+        // Pull Definition data down into secondary typography lines under the word node
+        if (d.layerIndex === 1) { // Word layer
+          const meanings = [];
+          const targets = verticalChildren.get(d.id);
+          if (targets) {
+            targets.forEach(tId => {
+              const targetNode = nodeById.get(tId);
+              if (targetNode && targetNode.layerIndex === 2) meanings.push(`"${targetNode.label}"`);
+            });
+          }
+          if (meanings.length > 0) inlineGlossText = meanings.join(", ");
+        }
       } else {
-        scaleFactor = 0.0;
         opacityValue = 0.0;
+        scaleFactor = 0.0;
       }
-    } else if (focusIndex === 0 && d.layerIndex === 1) {
-      scaleFactor = 0.7; opacityValue = 0.3;
     } else {
-      scaleFactor = 0.0; opacityValue = 0.0;
+      // --- BROAD PERSPECTIVE EXPLORER MODE ---
+      if (dist === 0) {
+        scaleFactor = 1.0; 
+        if (activeChildren) {
+          let isConnectedToVisibleChild = false;
+          activeChildren.forEach(childId => {
+            if (horizontalSynchronicNeighbors.get(childId) && horizontalSynchronicNeighbors.get(childId).has(d.id)) {
+              isConnectedToVisibleChild = true;
+            }
+          });
+          opacityValue = (activeChildren.has(d.id) || isConnectedToVisibleChild) ? 1.0 : 0.0;
+        } else {
+          opacityValue = 1.0;
+        }
+      } else if (dist < 0 && activeAncestors.has(d.id)) {
+        let depthSteps = Math.abs(dist);
+        scaleFactor = depthSteps === 1 ? 0.6 : 0.4; opacityValue = depthSteps === 1 ? 0.55 : 0.3;
+      } else if (dist > 0 && focusIndex === 1 && d.layerIndex === 2) {
+        if (visibleDownstreamDefinitions.has(d.id)) {
+          scaleFactor = 0.7; opacityValue = 0.4;
+        } else {
+          scaleFactor = 0.0; opacityValue = 0.0;
+        }
+      } else if (focusIndex === 0 && d.layerIndex === 1) {
+        scaleFactor = 0.7; opacityValue = 0.3;
+      } else {
+        scaleFactor = 0.0; opacityValue = 0.0;
+      }
     }
 
-    let baseRadius = 24;
+    let baseRadius = d.layerIndex === 0 ? 16 : 22;
     const isInspected = d.id === selectedInspectedNodeId;
     
     el.select("circle")
       .attr("r", baseRadius * scaleFactor * (isInspected ? 1.15 : 1.0))
-      .attr("fill", isInspected ? "var(--accent)" + "25" : layerColor[d.layerIndex] + (dist === 0 ? "35" : "10"))
+      .attr("fill", isInspected ? "var(--accent)" + "35" : (d.layerIndex === 0 ? "none" : layerColor[d.layerIndex] + (dist === 0 || selectedInspectedNodeId ? "35" : "10")))
       .attr("stroke", isInspected ? "var(--accent)" : layerColor[d.layerIndex])
-      .style("stroke-width", isInspected ? "3px" : "1.5px")
+      .style("stroke-width", isInspected ? "3px" : (d.layerIndex === 0 ? "1px" : "1.5px"))
       .style("stroke-opacity", opacityValue);
 
-    el.select("text")
-      .attr("font-size", (dist === 0 ? 11 : 8) + "px")
+    el.select("text.label-main")
+      .attr("font-size", (selectedInspectedNodeId ? (d.id === selectedInspectedNodeId ? 14 : 11) : (dist === 0 ? 11 : 8)) + "px")
       .style("fill-opacity", opacityValue)
+      .style("font-weight", d.layerIndex === 0 ? "400" : "600")
+      .style("fill", d.layerIndex === 0 ? "var(--muted)" : "var(--text)")
       .style("display", scaleFactor === 0 ? "none" : "block");
+
+    // Populate inline tree sub-text glosses
+    el.select("text.gloss")
+      .text(inlineGlossText)
+      .style("fill-opacity", opacityValue)
+      .style("display", inlineGlossText === "" ? "none" : "block");
 
     el.style("opacity", opacityValue).style("pointer-events", opacityValue > 0 ? "auto" : "none");
   });
 
   linkSel.style("opacity", (d) => {
-    if (focusIndex === 0 && d.densityRank > maxAllowedRank) return 0.0;
+    if (!selectedInspectedNodeId && focusIndex === 0 && d.densityRank > maxAllowedRank) return 0.0;
     
     const sNode = nodeById.get(d.source.id || d.source);
     const tNode = nodeById.get(d.target.id || d.target);
 
-    // Synchronic (MORPH_DERIVED) links
+    if (selectedInspectedNodeId) {
+      // Isolate links belonging specifically to active tree components
+      const hasMeaningLink = d.type === "HAS_MEANING" && (diachronicWordRelatives.has(sNode.id) || diachronicWordRelatives.has(tNode.id));
+      const hasDiachronicTreeLink = d.type === "DERIVED_FROM" && diachronicWordRelatives.has(sNode.id) && diachronicWordRelatives.has(tNode.id);
+      const hasLangTagLink = d.type === "BELONGS_TO" && diachronicWordRelatives.has(sNode.id || tNode.id);
+      
+      if (hasMeaningLink || hasDiachronicTreeLink || hasLangTagLink) return 0.85;
+      return 0.0;
+    }
+
+    // Standard structural links mapping rule for browse views
     if (d.isSynchronicMorph || d.type === "MORPH_DERIVED") {
       if (sNode.layerIndex === focusIndex && tNode.layerIndex === focusIndex) {
-        if (selectedInspectedNodeId) {
-          if (sNode.id === selectedInspectedNodeId || tNode.id === selectedInspectedNodeId) return 0.85;
-        } else if (activeChildren) {
-          if (activeChildren.has(sNode.id) || activeChildren.has(tNode.id)) return 0.85;
-        } else {
-          return 0.85;
-        }
+        return activeChildren ? ((activeChildren.has(sNode.id) || activeChildren.has(tNode.id)) ? 0.85 : 0.0) : 0.85;
       }
       return 0.0;
     }
 
-    // Word-to-word Diachronic (DERIVED_FROM) links
     if (d.type === "DERIVED_FROM") {
       if (sNode.layerIndex === focusIndex && tNode.layerIndex === focusIndex) {
-        if (selectedInspectedNodeId) {
-          const sConnects = sNode.id === selectedInspectedNodeId || diachronicWordRelatives.has(sNode.id);
-          const tConnects = tNode.id === selectedInspectedNodeId || diachronicWordRelatives.has(tNode.id);
-          if (sConnects && tConnects) return 0.85;
-        } else if (activeChildren) {
-          if (activeChildren.has(sNode.id) || activeChildren.has(tNode.id)) return 0.85;
-        } else {
-          return 0.85;
-        }
+        return activeChildren ? ((activeChildren.has(sNode.id) || activeChildren.has(tNode.id)) ? 0.85 : 0.0) : 0.85;
       }
       return 0.0;
     }
 
-    // Vertical structural scaffolding
-    const sVisible = (sNode.layerIndex === focusIndex && (!activeChildren || activeChildren.has(sNode.id) || sNode.id === selectedInspectedNodeId || (synchronicNeighbors && synchronicNeighbors.has(sNode.id)) || diachronicWordRelatives.has(sNode.id))) || activeAncestors.has(sNode.id) || (focusIndex === 0 && sNode.layerIndex === 1) || (focusIndex === 1 && sNode.layerIndex === 2 && visibleDownstreamDefinitions.has(sNode.id));
-    const tVisible = (tNode.layerIndex === focusIndex && (!activeChildren || activeChildren.has(tNode.id) || tNode.id === selectedInspectedNodeId || (synchronicNeighbors && synchronicNeighbors.has(tNode.id)) || diachronicWordRelatives.has(tNode.id))) || activeAncestors.has(tNode.id) || (focusIndex === 0 && tNode.layerIndex === 1) || (focusIndex === 1 && tNode.layerIndex === 2 && visibleDownstreamDefinitions.has(tNode.id));
+    const sVisible = (sNode.layerIndex === focusIndex && (!activeChildren || activeChildren.has(sNode.id))) || activeAncestors.has(sNode.id) || (focusIndex === 0 && sNode.layerIndex === 1) || (focusIndex === 1 && sNode.layerIndex === 2 && visibleDownstreamDefinitions.has(sNode.id));
+    const tVisible = (tNode.layerIndex === focusIndex && (!activeChildren || activeChildren.has(tNode.id))) || activeAncestors.has(tNode.id) || (focusIndex === 0 && tNode.layerIndex === 1) || (focusIndex === 1 && tNode.layerIndex === 2 && visibleDownstreamDefinitions.has(tNode.id));
 
-    if (sVisible && tVisible) {
-      return (sNode.layerIndex === focusIndex && tNode.layerIndex === focusIndex) ? 0.85 : 0.25;
-    }
-    return 0.0;
+    return (sVisible && tVisible) ? ((sNode.layerIndex === focusIndex && tNode.layerIndex === focusIndex) ? 0.85 : 0.25) : 0.0;
   });
+
+  // Dynamically assign edge curve structural class names for rendering updates
+  linkSel.attr("class", d => "edge " + d.kind + 
+    ((d.type === "DEVELOPED_INTO" || d.type === "DERIVED_FROM") ? " lineage" : "") + 
+    ((selectedInspectedNodeId && d.type === "DERIVED_FROM") ? " tree-branch" : ""));
 
   renderBreadcrumb();
 }
