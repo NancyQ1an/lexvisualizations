@@ -140,7 +140,6 @@ const SOURCE_NORMALIZATION_MAP = {
   "consensus": "Consensus"
 };
 
-// FIXED: Included w_normal and w_normalize directly in the default sample nodes CSV
 const SAMPLE_NODES_CSV =
 `id,label,layer,layer_name
 lang_latin,Latin,1,Languages
@@ -165,7 +164,6 @@ d_baptism,ritual purification,3,Definitions
 d_land,solid ground / earth,3,Definitions
 d_territory,region under control,3,Definitions`;
 
-// FIXED: Included Consensus relations for w_normal and w_normalize in the default sample edges CSV
 const SAMPLE_EDGES_CSV =
 `source,target,type,sources
 lang_latin,lang_french,DEVELOPED_INTO,LIV
@@ -440,22 +438,27 @@ function buildAndRender(nodeRows, edgeRows){
   nodeSel.append("circle");
   nodeSel.append("text").text(d => d.label);
 
+  // FIXED: Adjusted interaction patterns to keep focus targeted correctly when inspecting inside an active layer plane
   nodeSel.on("click", (e,d) => {
     e.stopPropagation();
     
-    if (d.layerIndex === focusIndex && horizontalSynchronicNeighbors.get(d.id).size > 0) {
+    if (d.layerIndex === focusIndex) {
       if (selectedInspectedNodeId === d.id) {
         selectedInspectedNodeId = null; 
       } else {
         selectedInspectedNodeId = d.id; 
       }
       render();
-    } else if (d.layerIndex < numLayers - 1) {
-      focusIndex = d.layerIndex + 1; activeParentId = d.id;
+    } 
+    else if (d.layerIndex < numLayers - 1) {
+      focusIndex = d.layerIndex + 1; 
+      activeParentId = d.id;
       selectedInspectedNodeId = null; 
-      calculateAncestry(); render();
+      calculateAncestry(); 
+      render();
     }
   });
+  
   nodeSel.on("mouseenter", (e,d) => highlight(d.id, adjacency));
   nodeSel.on("mouseleave", () => highlight(null, adjacency));
 
