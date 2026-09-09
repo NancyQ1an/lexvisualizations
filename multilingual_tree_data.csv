@@ -1,0 +1,41 @@
+id,word,parent_id,meaning,category,tags
+ROOT,*PIE,,Proto-Indo-European common ancestor,,PIE-root
+PIE_PTER,*péth₂r̥,ROOT,wing / feather,Nature,PIE-root
+GK_PTERON,πτερόν,PIE_PTER,wing / feather,Nature,Greek
+LAT_PENNA,penna,PIE_PTER,feather / wing,Nature,Latin
+SP_PENA,pluma,LAT_PENNA,feather,Nature,Spanish
+TOC_PACE,päts,PIE_PTER,wing,Nature,Tocharian-B
+PIE_AKW,*h₃ekʷ-,ROOT,eye / see,Body,PIE-root
+GK_OPS,ὄψ,PIE_AKW,eye / face,Body,Greek
+LAT_OCULUS,oculus,PIE_AKW,eye,Body,Latin
+SP_OJO,ojo,LAT_OCULUS,eye,Body,Spanish
+OHG_AUGE,ouga,PIE_AKW,eye,Body,OHG
+GER_AUGE,Auge,OHG_AUGE,eye,Body,German
+TOC_AK,ak,PIE_AKW,eye,Body,Tocharian-A
+PIE_KWON,*ḱwón-,ROOT,dog,Animals,PIE-root
+GK_KUON,κύων,PIE_KWON,dog,Animals,Greek
+LAT_CANIS,canis,PIE_KWON,dog,Animals,Latin
+SP_CAN,can,LAT_CANIS,dog / hound,Animals,Spanish
+TOC_KU,ku,PIE_KWON,dog,Animals,Tocharian-A
+PIE_MATR,*méh₂tēr,ROOT,mother,Family,PIE-root
+GK_METER,μήτηρ,PIE_MATR,mother,Family,Greek
+LAT_MATER,mater,PIE_MATR,mother,Family,Latin
+SP_MADRE,madre,LAT_MATER,mother,Family,Spanish
+TOC_MACER,mācer,PIE_MATR,mother,Family,Tocharian-B
+OHG_MUOTER,muoter,PIE_MATR,mother,Family,OHG
+GER_MUTTER,Mutter,OHG_MUOTER,mother,Family,German
+PIE_ED,*h₁ed-,ROOT,to eat,Food,PIE-root
+LAT_EDERE,edere,PIE_ED,to eat,Food,Latin
+LAT_ESCA,esca,LAT_EDERE,food / bait,Food,Latin
+SP_COMER,comer,LAT_EDERE,to eat,Food,Spanish
+GK_EDO,ἔδω,PIE_ED,to eat,Food,Greek
+TOC_IT,it-,PIE_ED,to eat,Food,Tocharian-A
+PIE_NEBH,*nébʰos,ROOT,sky / cloud,Nature,PIE-root
+GK_NEPHOS,νέφος,PIE_NEBH,cloud,Nature,Greek
+LAT_NEBULA,nebula,PIE_NEBH,mist / fog,Nature,Latin
+SP_NIEBLA,niebla,LAT_NEBULA,fog,Nature,Spanish
+TOC_NEPO,nepo,PIE_NEBH,sky,Nature,Tocharian-B
+PIE_TREYES,*tréyes,ROOT,three,Numbers,PIE-root
+GK_TREIS,τρεῖς,PIE_TREYES,three,Numbers,Greek
+LAT_TRES,tres,PIE_TREYES,three,Numbers,Latin
+TOC_TRI,trai,PIE_TREYES,three,Numbers,Tocharian-A
