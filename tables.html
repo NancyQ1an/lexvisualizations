@@ -79,7 +79,27 @@
     </div>
     <div class="table-block">
       <h2>Relational (Edges) Table</h2>
+      <div class="sub">TAGGED_AS (word &rarr; language) is the inverse of HAS_WORD and is not stored as a duplicate row &mdash; swap source/target on a HAS_WORD row to derive it.</div>
       <div id="edgesTableWrap"><div class="empty-note">Upload a CSV, or click "Load Sample Dataset".</div></div>
+    </div>
+    <div class="table-block">
+      <h2>Semantic Categories</h2>
+      <div class="sub">Self-referential: tier 1 is the broad category, tier 2 (parent_category_id set) is each root concept's meaning.</div>
+      <div id="categoriesTableWrap"><div class="empty-note">Upload a CSV, or click "Load Sample Dataset".</div></div>
+    </div>
+    <div class="table-block">
+      <h2>Word &harr; Category Links</h2>
+      <div id="wordCategoriesTableWrap"><div class="empty-note">Upload a CSV, or click "Load Sample Dataset".</div></div>
+    </div>
+    <div class="table-block">
+      <h2>Sources</h2>
+      <div class="sub">Only populated for the built-in sample dataset &mdash; an uploaded CSV carries no citation data to attach.</div>
+      <div id="sourcesTableWrap"><div class="empty-note">Click "Load Sample Dataset" to see sample sources.</div></div>
+    </div>
+    <div class="table-block">
+      <h2>Citations</h2>
+      <div class="sub">Illustrative sample citations (LIV, Pokorny, OED) &mdash; loci/notes are not verified against the physical dictionaries.</div>
+      <div id="citationsTableWrap"><div class="empty-note">Click "Load Sample Dataset" to see sample citations.</div></div>
     </div>
   </div>
 </div>
@@ -138,31 +158,53 @@ function setStatus(msg, kind){
 document.getElementById("csvFile").addEventListener("change", e => {
   const file = e.target.files[0];
   if (!file) return;
-  Papa.parse(file, {header:true, dynamicTyping:true, skipEmptyLines:true, complete: r => build(r.data)});
+  Papa.parse(file, {header:true, dynamicTyping:true, skipEmptyLines:true, complete: r => build(r.data, false)});
 });
 
 document.getElementById("loadSample").addEventListener("click", () => {
-  Papa.parse(SAMPLE_CSV, {header:true, dynamicTyping:true, skipEmptyLines:true, complete: r => build(r.data)});
+  Papa.parse(SAMPLE_CSV, {header:true, dynamicTyping:true, skipEmptyLines:true, complete: r => build(r.data, true)});
 });
 
-// Mirrors relational_database.py: builds a normalized "words" table (one row
-// per unique id) and an "edges" table (parent_id -> id relationships) from a
-// flat CSV of shape id, word, parent_id, meaning, category, tags.
-//
-// Builds a Words table containing one entity row per unique CSV id
-// (node_type=WORD), plus synthetic entity rows for each distinct language
-// (tags), semantic category (category), and semantic subcategory (the
-// meaning of each root-level concept, i.e. a direct child of a root/blank
-// parent_id row). All entity kinds share one word_id space so edges can
-// point at any of them. The Edges table then expresses several kinds of
-// relationship_type between those entities:
+// Sample sources/citations for the built-in sample dataset only -
+// multilingual_tree_data.csv carries no citation data of its own, and these
+// loci/notes are illustrative (not verified against the physical
+// dictionaries), included to demonstrate the sources/citations schema.
+const SAMPLE_SOURCES = ["LIV", "Pokorny", "OED"];
+const SAMPLE_CITATIONS = [
+  ["PIE_PTER", "Pokorny", "Pokorny 1959, p. 825, s.v. *pet-",
+   "Root meaning 'to fly, fall'; source for the 'wing/feather' word family."],
+  ["PIE_PTER", "LIV", "LIV, s.v. *peth2-",
+   "Verbal root 'to fly'; laryngeal-inclusive notation differs from Pokorny's older *pet-."],
+  ["PIE_AKW", "Pokorny", "Pokorny 1959, p. 775, s.v. *okw-",
+   "Root for 'to see, eye'."],
+  ["GER_AUGE", "OED", "OED, s.v. eye, n., Etymology",
+   "Cross-linguistic cognate note including Germanic *augo and PIE *h3ekw-."],
+  ["PIE_KWON", "Pokorny", "Pokorny 1959, p. 632, s.v. *kwon-",
+   "Root for 'dog'."],
+  ["LAT_CANIS", "OED", "OED, s.v. canine, adj., Etymology",
+   "Traces Latin canis to its PIE root."],
+  ["PIE_MATR", "Pokorny", "Pokorny 1959, p. 700, s.v. *mater-",
+   "Kinship term 'mother'."],
+  ["PIE_ED", "LIV", "LIV, s.v. *h1ed-",
+   "Verbal root 'to eat'."],
+  ["LAT_EDERE", "OED", "OED, s.v. edible, adj., Etymology",
+   "Traces Latin edere to PIE *h1ed-."],
+  ["PIE_NEBH", "Pokorny", "Pokorny 1959, p. 315, s.v. *nebh-",
+   "Root for 'cloud, mist, sky'."]
+];
+
+// Mirrors relational_database.py: builds a normalized Words table (one row
+// per unique CSV id, node_type=WORD, plus a synthetic entity row per
+// distinct language/tags value, node_type=LANGUAGE), a self-referential
+// Semantic Categories table (tier 1 = broad category, tier 2 = each
+// root-level concept's meaning), a word_categories bridge table, and an
+// Edges table expressing several kinds of relationship_type:
 //   DEVELOPED_INTO - word-to-word lineage (parent_id -> id)
-//   HAS_WORD / TAGGED_AS - language <-> word membership
-//   RESOLVES_INTO - semantic category -> subcategory
+//   HAS_WORD - language -> word (TAGGED_AS is its inverse, derived not stored)
 //   CONNECTED_TO - synchronic siblings (same parent_id AND same tags)
 function isBlank(v){ return v === undefined || v === null || v === ""; }
 
-function buildRelationalTables(rows){
+function buildRelationalTables(rows, includeSampleCitations){
   const csvRows = rows.filter(r => !isBlank(r.id));
   const words = [];
   const wordIdByCsvId = new Map();
@@ -183,23 +225,39 @@ function buildRelationalTables(rows){
                   meaning: "", category: "", tags: "" });
   });
 
-  const categoryWordId = new Map();
+  // Semantic categories: self-referential (tier 1 = broad category, tier 2 =
+  // each root-level concept's meaning), instead of baking category/
+  // subcategory into the words table as extra node types.
+  const semanticCategories = [];
+  const categoryIdByLabel = new Map();
   [...new Set(csvRows.map(r => r.category).filter(c => !isBlank(c)))].sort().forEach(cat => {
-    const wordId = words.length + 1;
-    categoryWordId.set(cat, wordId);
-    words.push({ word_id: wordId, node_type: "CATEGORY", id: "", word: cat,
-                  meaning: "", category: "", tags: "" });
+    const categoryId = semanticCategories.length + 1;
+    categoryIdByLabel.set(cat, categoryId);
+    semanticCategories.push({ category_id: categoryId, label: cat, parent_category_id: null });
   });
 
   const rootIds = new Set(csvRows.filter(r => isBlank(r.parent_id)).map(r => String(r.id)));
   const rootConcepts = csvRows.filter(r => rootIds.has(String(r.parent_id)));
-  const subcategoryWordId = new Map();
+  const subcategoryIdByMeaning = new Map();
   rootConcepts.forEach(r => {
-    if (subcategoryWordId.has(r.meaning)) return;
-    const wordId = words.length + 1;
-    subcategoryWordId.set(r.meaning, wordId);
-    words.push({ word_id: wordId, node_type: "SUBCATEGORY", id: "", word: r.meaning,
-                  meaning: "", category: r.category, tags: "" });
+    if (subcategoryIdByMeaning.has(r.meaning)) return;
+    const categoryId = semanticCategories.length + 1;
+    subcategoryIdByMeaning.set(r.meaning, categoryId);
+    semanticCategories.push({ category_id: categoryId, label: r.meaning,
+                               parent_category_id: categoryIdByLabel.get(r.category) });
+  });
+
+  // word_categories bridge (many-to-many): every word links to its broad
+  // category; root-level concepts additionally link to their own subcategory.
+  const wordCategories = [];
+  csvRows.forEach(r => {
+    if (isBlank(r.category)) return;
+    wordCategories.push({ word_id: wordIdByCsvId.get(String(r.id)),
+                           category_id: categoryIdByLabel.get(r.category) });
+  });
+  rootConcepts.forEach(r => {
+    wordCategories.push({ word_id: wordIdByCsvId.get(String(r.id)),
+                           category_id: subcategoryIdByMeaning.get(r.meaning) });
   });
 
   const edges = [];
@@ -218,22 +276,11 @@ function buildRelationalTables(rows){
     addEdge(sourceWordId, targetWordId, "DEVELOPED_INTO", tagsByCsvId.get(String(r.parent_id)) !== r.tags);
   });
 
-  // HAS_WORD (language -> word) and TAGGED_AS (word -> language).
+  // HAS_WORD (language -> word). TAGGED_AS is its inverse and is not stored
+  // as a duplicate row - swap source/target on a HAS_WORD row to derive it.
   csvRows.forEach(r => {
     if (isBlank(r.tags)) return;
-    const langWordId = languageWordId.get(r.tags);
-    const wordId = wordIdByCsvId.get(String(r.id));
-    addEdge(langWordId, wordId, "HAS_WORD", null);
-    addEdge(wordId, langWordId, "TAGGED_AS", null);
-  });
-
-  // RESOLVES_INTO: semantic category -> subcategory.
-  const seenCategoryMeaning = new Set();
-  rootConcepts.forEach(r => {
-    const key = r.category + "||" + r.meaning;
-    if (seenCategoryMeaning.has(key)) return;
-    seenCategoryMeaning.add(key);
-    addEdge(categoryWordId.get(r.category), subcategoryWordId.get(r.meaning), "RESOLVES_INTO", null);
+    addEdge(languageWordId.get(r.tags), wordIdByCsvId.get(String(r.id)), "HAS_WORD", null);
   });
 
   // CONNECTED_TO: synchronic siblings - share a parent_id AND a tags value.
@@ -252,7 +299,26 @@ function buildRelationalTables(rows){
     }
   });
 
-  return { words, edges };
+  // Sources/citations: only populated for the built-in sample dataset, since
+  // an arbitrary uploaded CSV carries no citation data to attach.
+  const sources = [];
+  const citations = [];
+  if (includeSampleCitations){
+    const sourceIdByName = new Map();
+    SAMPLE_SOURCES.forEach(name => {
+      const sourceId = sources.length + 1;
+      sourceIdByName.set(name, sourceId);
+      sources.push({ source_id: sourceId, name: name });
+    });
+    SAMPLE_CITATIONS.forEach(([csvId, sourceName, locus, note]) => {
+      const wordId = wordIdByCsvId.get(csvId);
+      if (wordId === undefined) return;
+      citations.push({ citation_id: citations.length + 1, word_id: wordId,
+                        source_id: sourceIdByName.get(sourceName), locus: locus, note: note });
+    });
+  }
+
+  return { words, edges, semanticCategories, wordCategories, sources, citations };
 }
 
 function renderTable(container, rows, columns){
@@ -287,14 +353,27 @@ function renderTable(container, rows, columns){
   container.appendChild(table);
 }
 
-function build(rows){
+function build(rows, includeSampleCitations){
   try{
-    const { words, edges } = buildRelationalTables(rows);
+    const { words, edges, semanticCategories, wordCategories, sources, citations } =
+      buildRelationalTables(rows, includeSampleCitations);
     renderTable(document.getElementById("wordsTableWrap"), words,
       ["word_id", "node_type", "id", "word", "meaning", "category", "tags"]);
     renderTable(document.getElementById("edgesTableWrap"), edges,
       ["edge_id", "source_word_id", "target_word_id", "relationship_type", "is_diachronic"]);
-    setStatus(`Built ${words.length} words / ${edges.length} edges.`, "ok");
+    renderTable(document.getElementById("categoriesTableWrap"), semanticCategories,
+      ["category_id", "label", "parent_category_id"]);
+    renderTable(document.getElementById("wordCategoriesTableWrap"), wordCategories,
+      ["word_id", "category_id"]);
+    renderTable(document.getElementById("sourcesTableWrap"), sources,
+      ["source_id", "name"]);
+    renderTable(document.getElementById("citationsTableWrap"), citations,
+      ["citation_id", "word_id", "source_id", "locus", "note"]);
+    setStatus(
+      `Built ${words.length} words / ${edges.length} edges / ` +
+      `${semanticCategories.length} categories / ${citations.length} citations.`,
+      "ok"
+    );
   } catch(err){
     setStatus("Error: " + err.message, "error");
   }

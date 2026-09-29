@@ -15,7 +15,18 @@ There are no lint or test commands configured for this project.
 ## Data files
 
 - [multilingual_tree_data.csv](multilingual_tree_data.csv) — a flat etymology dataset (`id, word, parent_id, meaning, category, tags`) used as source data for the relational model below. Not consumed directly by `index.html`.
-- [relational_database.py](relational_database.py) — a one-off migration script that normalizes `multilingual_tree_data.csv` into a `words` / `edges` relational schema and writes it to a local SQLite file (`etymology.db`) via pandas. Run with `python relational_database.py` (requires `pandas`). This is exploratory/offline tooling, separate from the browser visualization.
+- [relational_database.py](relational_database.py) — a one-off migration script that normalizes `multilingual_tree_data.csv` into a relational schema and writes it to a local SQLite file (`etymology.db`) via pandas. Run with `python relational_database.py` (requires `pandas`). This is exploratory/offline tooling, separate from the browser visualization.
+- [tables.html](tables.html) — a standalone browser page (PapaParse only, no build step) that lets anyone upload the same flat CSV (or click "Load Sample Dataset") and see the same relational schema rendered as HTML tables, without needing Python/SQLite. `buildRelationalTables()` in this file must be kept logically in sync with `relational_database.py` — they're independent implementations of the same graph-building logic.
+
+### Relational schema (relational_database.py / tables.html)
+
+Six tables, built from the flat CSV:
+
+- **words** — one row per unique CSV `id` (`node_type=WORD`), plus one synthetic row per distinct `tags` value (`node_type=LANGUAGE`).
+- **edges** — `relationship_type` is one of: `DEVELOPED_INTO` (word→word lineage, `is_diachronic` flags whether the `tags` value changed), `HAS_WORD` (language→word; its inverse `TAGGED_AS` is derived, not stored — a SQL `VIEW` in the sqlite output, a comment/note in `tables.html`), `CONNECTED_TO` (synchronic siblings — same `parent_id` *and* same `tags` — stored once per pair, not twice).
+- **semantic_categories** — self-referential (`category_id`, `label`, `parent_category_id`): tier 1 is the broad `category` column value, tier 2 is each root-level concept's `meaning`, parented under its tier-1 category.
+- **word_categories** — many-to-many bridge between `words` and `semantic_categories`.
+- **sources** / **citations** — LIV/Pokorny/OED-style citation tracking (`citations.word_id` → `sources.source_id`, plus `locus`/`note`). Only populated for the built-in sample dataset in `tables.html` (an arbitrary uploaded CSV has no citation data to attach); the sample citations are illustrative, not verified against the physical dictionaries.
 
 ## Architecture of index.html
 
