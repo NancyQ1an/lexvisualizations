@@ -106,47 +106,57 @@
 
 <script>
 const SAMPLE_CSV =
-`id,word,parent_id,meaning,category,tags
-ROOT,*PIE,,Proto-Indo-European common ancestor,,PIE-root
-PIE_PTER,*péth₂r̥,ROOT,wing / feather,Nature,PIE-root
-GK_PTERON,πτερόν,PIE_PTER,wing / feather,Nature,Greek
-LAT_PENNA,penna,PIE_PTER,feather / wing,Nature,Latin
-SP_PENA,pluma,LAT_PENNA,feather,Nature,Spanish
-TOC_PACE,päts,PIE_PTER,wing,Nature,Tocharian-B
-PIE_AKW,*h₃ekʷ-,ROOT,eye / see,Body,PIE-root
-GK_OPS,ὄψ,PIE_AKW,eye / face,Body,Greek
-LAT_OCULUS,oculus,PIE_AKW,eye,Body,Latin
-SP_OJO,ojo,LAT_OCULUS,eye,Body,Spanish
-OHG_AUGE,ouga,PIE_AKW,eye,Body,OHG
-GER_AUGE,Auge,OHG_AUGE,eye,Body,German
-TOC_AK,ak,PIE_AKW,eye,Body,Tocharian-A
-PIE_KWON,*ḱwón-,ROOT,dog,Animals,PIE-root
-GK_KUON,κύων,PIE_KWON,dog,Animals,Greek
-LAT_CANIS,canis,PIE_KWON,dog,Animals,Latin
-SP_CAN,can,LAT_CANIS,dog / hound,Animals,Spanish
-TOC_KU,ku,PIE_KWON,dog,Animals,Tocharian-A
-PIE_MATR,*méh₂tēr,ROOT,mother,Family,PIE-root
-GK_METER,μήτηρ,PIE_MATR,mother,Family,Greek
-LAT_MATER,mater,PIE_MATR,mother,Family,Latin
-SP_MADRE,madre,LAT_MATER,mother,Family,Spanish
-TOC_MACER,mācer,PIE_MATR,mother,Family,Tocharian-B
-OHG_MUOTER,muoter,PIE_MATR,mother,Family,OHG
-GER_MUTTER,Mutter,OHG_MUOTER,mother,Family,German
-PIE_ED,*h₁ed-,ROOT,to eat,Food,PIE-root
-LAT_EDERE,edere,PIE_ED,to eat,Food,Latin
-LAT_ESCA,esca,LAT_EDERE,food / bait,Food,Latin
-SP_COMER,comer,LAT_EDERE,to eat,Food,Spanish
-GK_EDO,ἔδω,PIE_ED,to eat,Food,Greek
-TOC_IT,it-,PIE_ED,to eat,Food,Tocharian-A
-PIE_NEBH,*nébʰos,ROOT,sky / cloud,Nature,PIE-root
-GK_NEPHOS,νέφος,PIE_NEBH,cloud,Nature,Greek
-LAT_NEBULA,nebula,PIE_NEBH,mist / fog,Nature,Latin
-SP_NIEBLA,niebla,LAT_NEBULA,fog,Nature,Spanish
-TOC_NEPO,nepo,PIE_NEBH,sky,Nature,Tocharian-B
-PIE_TREYES,*tréyes,ROOT,three,Numbers,PIE-root
-GK_TREIS,τρεῖς,PIE_TREYES,three,Numbers,Greek
-LAT_TRES,tres,PIE_TREYES,three,Numbers,Latin
-TOC_TRI,trai,PIE_TREYES,three,Numbers,Tocharian-A
+`id,word,parent_id,meaning,category,tags,paradigm_id
+ROOT,*PIE,,Proto-Indo-European common ancestor,,PIE-root,
+PIE_PTER,*péth₂r̥,ROOT,wing / feather,Nature,PIE-root,
+GK_PTERON,πτερόν,PIE_PTER,wing / feather,Nature,Greek,
+LAT_PENNA,penna,PIE_PTER,feather / wing,Nature,Latin,
+SP_PENA,pluma,LAT_PENNA,feather,Nature,Spanish,
+TOC_PACE,päts,PIE_PTER,wing,Nature,Tocharian-B,
+PIE_AKW,*h₃ekʷ-,ROOT,eye / see,Body,PIE-root,
+GK_OPS,ὄψ,PIE_AKW,eye / face,Body,Greek,
+LAT_OCULUS,oculus,PIE_AKW,eye,Body,Latin,
+SP_OJO,ojo,LAT_OCULUS,eye,Body,Spanish,
+OHG_AUGE,ouga,PIE_AKW,eye,Body,OHG,
+GER_AUGE,Auge,OHG_AUGE,eye,Body,German,
+TOC_AK,ak,PIE_AKW,eye,Body,Tocharian-A,
+PIE_KWON,*ḱwón-,ROOT,dog,Animals,PIE-root,
+GK_KUON,κύων,PIE_KWON,dog,Animals,Greek,
+LAT_CANIS,canis,PIE_KWON,dog,Animals,Latin,
+SP_CAN,can,LAT_CANIS,dog / hound,Animals,Spanish,
+TOC_KU,ku,PIE_KWON,dog,Animals,Tocharian-A,
+PIE_MATR,*méh₂tēr,ROOT,mother,Family,PIE-root,
+GK_METER,μήτηρ,PIE_MATR,mother,Family,Greek,
+LAT_MATER,mater,PIE_MATR,mother,Family,Latin,
+SP_MADRE,madre,LAT_MATER,mother,Family,Spanish,
+TOC_MACER,mācer,PIE_MATR,mother,Family,Tocharian-B,
+OHG_MUOTER,muoter,PIE_MATR,mother,Family,OHG,
+GER_MUTTER,Mutter,OHG_MUOTER,mother,Family,German,
+PIE_ED,*h₁ed-,ROOT,to eat,Food,PIE-root,
+LAT_EDERE,edere,PIE_ED,to eat,Food,Latin,
+LAT_ESCA,esca,LAT_EDERE,food / bait,Food,Latin,
+SP_COMER,comer,LAT_EDERE,to eat,Food,Spanish,
+GK_EDO,ἔδω,PIE_ED,to eat,Food,Greek,
+TOC_IT,it-,PIE_ED,to eat,Food,Tocharian-A,
+PIE_NEBH,*nébʰos,ROOT,sky / cloud,Nature,PIE-root,
+GK_NEPHOS,νέφος,PIE_NEBH,cloud,Nature,Greek,
+LAT_NEBULA,nebula,PIE_NEBH,mist / fog,Nature,Latin,
+SP_NIEBLA,niebla,LAT_NEBULA,fog,Nature,Spanish,
+TOC_NEPO,nepo,PIE_NEBH,sky,Nature,Tocharian-B,
+PIE_TREYES,*tréyes,ROOT,three,Numbers,PIE-root,
+GK_TREIS,τρεῖς,PIE_TREYES,three,Numbers,Greek,
+LAT_TRES,tres,PIE_TREYES,three,Numbers,Latin,
+TOC_TRI,trai,PIE_TREYES,three,Numbers,Tocharian-A,
+PIE_ES,*h₁es-,ROOT,to be / exist,Grammar,PIE-root,
+PIE_WES,*h₂wes-,ROOT,to dwell / remain,Grammar,PIE-root,
+PIE_BHU,*bʰuH-,ROOT,to become / grow,Grammar,PIE-root,
+ENG_AM,am,PIE_ES,to be (1st sg. present),Grammar,English,ENG_BE
+ENG_IS,is,PIE_ES,to be (3rd sg. present),Grammar,English,ENG_BE
+ENG_ARE,are,PIE_ES,to be (plural / 2nd present),Grammar,English,ENG_BE
+ENG_WAS,was,PIE_WES,to be (singular past),Grammar,English,ENG_BE
+ENG_WERE,were,PIE_WES,to be (plural past),Grammar,English,ENG_BE
+ENG_BE,be,PIE_BHU,to be (infinitive),Grammar,English,ENG_BE
+ENG_BEEN,been,PIE_BHU,to be (past participle),Grammar,English,ENG_BE
 `;
 
 function setStatus(msg, kind){
@@ -276,6 +286,24 @@ function buildRelationalTables(rows, includeSampleCitations){
     addEdge(sourceWordId, targetWordId, "DEVELOPED_INTO", tagsByCsvId.get(String(r.parent_id)) !== r.tags);
   });
 
+  // DEVELOPED_INTO: language-to-language, aggregated from the word-level
+  // evidence above. Every diachronic word transition (tags changed from
+  // parent to child) is itself evidence that the parent's language developed
+  // into the child's language, so collect the distinct (parentTag, childTag)
+  // pairs and emit one language-level edge per pair.
+  const languagePairs = new Set();
+  csvRows.forEach(r => {
+    if (isBlank(r.parent_id)) return;
+    const parentTag = tagsByCsvId.get(String(r.parent_id));
+    if (!isBlank(parentTag) && parentTag !== r.tags) {
+      languagePairs.add(parentTag + "||" + r.tags);
+    }
+  });
+  [...languagePairs].sort().forEach(pair => {
+    const [parentTag, childTag] = pair.split("||");
+    addEdge(languageWordId.get(parentTag), languageWordId.get(childTag), "DEVELOPED_INTO", true);
+  });
+
   // HAS_WORD (language -> word). TAGGED_AS is its inverse and is not stored
   // as a duplicate row - swap source/target on a HAS_WORD row to derive it.
   csvRows.forEach(r => {
@@ -283,11 +311,16 @@ function buildRelationalTables(rows, includeSampleCitations){
     addEdge(languageWordId.get(r.tags), wordIdByCsvId.get(String(r.id)), "HAS_WORD", null);
   });
 
-  // CONNECTED_TO: synchronic siblings - share a parent_id AND a tags value.
+  // CONNECTED_TO: words explicitly curated as belonging to the same paradigm
+  // (paradigm_id), e.g. English "to be" (am/is/are, was/were, be/been), each
+  // tracing back to a *different* PIE root. This relation cannot be inferred
+  // from parent_id/tags - suppletive paradigm members share no ancestor and
+  // often no language-internal derivation, so it requires its own curated
+  // data. Stored once per pair (undirected), not twice.
   const groups = new Map();
   csvRows.forEach(r => {
-    if (isBlank(r.parent_id) || isBlank(r.tags)) return;
-    const key = r.parent_id + "||" + r.tags;
+    if (isBlank(r.paradigm_id)) return;
+    const key = r.paradigm_id;
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(r.id);
   });

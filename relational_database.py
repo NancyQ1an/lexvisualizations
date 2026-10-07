@@ -82,6 +82,27 @@ for row in df.itertuples():
         "is_diachronic": tags_by_csv_id[row.parent_id] != row.tags,
     })
 
+# 5a2. DEVELOPED_INTO - language-to-language: aggregated from the word-level
+# evidence above. Every diachronic word transition (tags changed from parent
+# to child) is itself evidence that the parent's language developed into the
+# child's language, so collect the distinct (parent_tag, child_tag) pairs and
+# emit one language-level edge per pair.
+language_pairs = set()
+for row in df.itertuples():
+    if pd.isna(row.parent_id):
+        continue
+    parent_tag = tags_by_csv_id[row.parent_id]
+    if parent_tag != row.tags:
+        language_pairs.add((parent_tag, row.tags))
+
+for parent_tag, child_tag in sorted(language_pairs):
+    edges.append({
+        "source_word_id": language_word_id[parent_tag],
+        "target_word_id": language_word_id[child_tag],
+        "relationship_type": "DEVELOPED_INTO",
+        "is_diachronic": True,
+    })
+
 # 5b. HAS_WORD (language -> word), derived from each word's tags value.
 # TAGGED_AS (word -> language) is its inverse and is exposed as a SQL view
 # (step 7) instead of being stored as a duplicate physical row.
@@ -93,20 +114,23 @@ for row in df.itertuples():
         "is_diachronic": None,
     })
 
-# 5c. CONNECTED_TO (synchronic word-to-word) - sibling words that share both
-# a parent and a language, i.e. they coexist rather than one having
-# developed into the other. Stored once per pair (undirected), not twice.
-for parent_id, group in df.groupby("parent_id"):
-    for tag, same_tag_group in group.groupby("tags"):
-        ids = same_tag_group["id"].tolist()
-        for i in range(len(ids)):
-            for j in range(i + 1, len(ids)):
-                edges.append({
-                    "source_word_id": word_id_by_csv_id[ids[i]],
-                    "target_word_id": word_id_by_csv_id[ids[j]],
-                    "relationship_type": "CONNECTED_TO",
-                    "is_diachronic": False,
-                })
+# 5c. CONNECTED_TO (synchronic word-to-word) - words explicitly curated as
+# belonging to the same paradigm (paradigm_id), e.g. English "to be"
+# (am/is/are, was/were, be/been), each tracing back to a *different* PIE
+# root (*h1es-, *h2wes-, *bhuH-). This relation cannot be inferred from
+# parent_id/tags - suppletive paradigm members share no ancestor and often
+# no language-internal derivation, so it requires its own curated data.
+# Stored once per pair (undirected), not twice.
+for paradigm_id, group in df.dropna(subset=["paradigm_id"]).groupby("paradigm_id"):
+    ids = group["id"].tolist()
+    for i in range(len(ids)):
+        for j in range(i + 1, len(ids)):
+            edges.append({
+                "source_word_id": word_id_by_csv_id[ids[i]],
+                "target_word_id": word_id_by_csv_id[ids[j]],
+                "relationship_type": "CONNECTED_TO",
+                "is_diachronic": False,
+            })
 
 edges_df = pd.DataFrame(edges).drop_duplicates().reset_index(drop=True)
 edges_df.insert(0, "edge_id", edges_df.index + 1)
