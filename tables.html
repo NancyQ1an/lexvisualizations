@@ -83,9 +83,19 @@
       <div id="edgesTableWrap"><div class="empty-note">Upload a CSV, or click "Load Sample Dataset".</div></div>
     </div>
     <div class="table-block">
+      <h2>Semantic Schemes</h2>
+      <div class="sub">The classification system a category's hierarchy edge belongs to (e.g. Buck's Schema, Swadesh List, Concepticon).</div>
+      <div id="schemesTableWrap"><div class="empty-note">Upload a CSV, or click "Load Sample Dataset".</div></div>
+    </div>
+    <div class="table-block">
       <h2>Semantic Categories</h2>
-      <div class="sub">Self-referential: tier 1 is the broad category, tier 2 (parent_category_id set) is each root concept's meaning.</div>
+      <div class="sub">Just id + label &mdash; no parent or scheme here. Hierarchy and scheme live on the category_edges relationship below, not on the category node.</div>
       <div id="categoriesTableWrap"><div class="empty-note">Upload a CSV, or click "Load Sample Dataset".</div></div>
+    </div>
+    <div class="table-block">
+      <h2>Category Edges (RESOLVES_INTO)</h2>
+      <div class="sub">scheme_id is a property of this edge, not of either category node &mdash; the same category could in principle be nested differently under different schemes. Tier-1 categories have no parent_category_id and resolve directly into their scheme instead (the scheme is the implicit root of its own tree).</div>
+      <div id="categoryEdgesTableWrap"><div class="empty-note">Upload a CSV, or click "Load Sample Dataset".</div></div>
     </div>
     <div class="table-block">
       <h2>Word &harr; Category Links</h2>
@@ -98,7 +108,7 @@
     </div>
     <div class="table-block">
       <h2>Citations</h2>
-      <div class="sub">Illustrative sample citations (LIV, Pokorny, OED) &mdash; loci/notes are not verified against the physical dictionaries.</div>
+      <div class="sub">Illustrative sample citations (LIV, Pokorny, OED) &mdash; loci/notes are not verified against the physical dictionaries. Each citation attaches to the specific DEVELOPED_INTO edge it attests to, not to a word in isolation.</div>
       <div id="citationsTableWrap"><div class="empty-note">Click "Load Sample Dataset" to see sample citations.</div></div>
     </div>
   </div>
@@ -235,15 +245,36 @@ function buildRelationalTables(rows, includeSampleCitations){
                   meaning: "", category: "", tags: "" });
   });
 
+  // Semantic schemes: the classification system a semantic category belongs
+  // to. Three schemes are included so the scheme_id relation is actually
+  // exercised rather than always pointing at the same row - names are
+  // approximate labels (not verified against the real published schemes),
+  // and the assignment below (which category goes to which scheme) is
+  // illustrative for testing, not a scholarly mapping - placeholder until
+  // the professor confirms the exact tagging-scheme/tag entity shape.
+  const semanticSchemes = [
+    { scheme_id: 1, name: "Buck's Schema (approximate)" },
+    { scheme_id: 2, name: "Swadesh List (approximate)" },
+    { scheme_id: 3, name: "Concepticon (approximate)" },
+  ];
+  const BUCKS_SCHEME_ID = 1;
+  const SWADESH_SCHEME_ID = 2;
+  const CONCEPTICON_SCHEME_ID = 3;
+
   // Semantic categories: self-referential (tier 1 = broad category, tier 2 =
   // each root-level concept's meaning), instead of baking category/
-  // subcategory into the words table as extra node types.
+  // subcategory into the words table as extra node types. The category row
+  // itself carries no scheme information - which scheme classifies a
+  // category is a property of the RESOLVES_INTO edge between two category
+  // nodes (categoryEdges, below), not of the category node, since the same
+  // category could in principle be nested differently under different
+  // schemes.
   const semanticCategories = [];
   const categoryIdByLabel = new Map();
   [...new Set(csvRows.map(r => r.category).filter(c => !isBlank(c)))].sort().forEach(cat => {
     const categoryId = semanticCategories.length + 1;
     categoryIdByLabel.set(cat, categoryId);
-    semanticCategories.push({ category_id: categoryId, label: cat, parent_category_id: null });
+    semanticCategories.push({ category_id: categoryId, label: cat });
   });
 
   const rootIds = new Set(csvRows.filter(r => isBlank(r.parent_id)).map(r => String(r.id)));
@@ -253,8 +284,38 @@ function buildRelationalTables(rows, includeSampleCitations){
     if (subcategoryIdByMeaning.has(r.meaning)) return;
     const categoryId = semanticCategories.length + 1;
     subcategoryIdByMeaning.set(r.meaning, categoryId);
-    semanticCategories.push({ category_id: categoryId, label: r.meaning,
-                               parent_category_id: categoryIdByLabel.get(r.category) });
+    semanticCategories.push({ category_id: categoryId, label: r.meaning });
+  });
+
+  // category_edges: the RESOLVES_INTO hierarchy between category nodes, with
+  // scheme_id as an edge property. Tier-1 categories have no parent category,
+  // so their edge's parent_category_id is null and it resolves directly into
+  // the scheme instead - the scheme acts as the implicit root of its own
+  // category tree. Assigned to Buck's Schema for tier 1, except "Grammar"
+  // (a function-word grouping that doesn't fit a semantic-field scheme)
+  // which resolves into Concepticon instead, illustrating why more than one
+  // scheme is useful. Tier 2 resolves into the Swadesh List, since that
+  // scheme is specifically a list of basic/core concepts rather than broad
+  // fields.
+  const categoryEdges = [];
+  categoryIdByLabel.forEach((categoryId, label) => {
+    categoryEdges.push({
+      category_edge_id: categoryEdges.length + 1,
+      child_category_id: categoryId,
+      parent_category_id: null,
+      relationship_type: "RESOLVES_INTO",
+      scheme_id: label === "Grammar" ? CONCEPTICON_SCHEME_ID : BUCKS_SCHEME_ID,
+    });
+  });
+  subcategoryIdByMeaning.forEach((categoryId, meaning) => {
+    const parentLabel = rootConcepts.find(r => r.meaning === meaning).category;
+    categoryEdges.push({
+      category_edge_id: categoryEdges.length + 1,
+      child_category_id: categoryId,
+      parent_category_id: categoryIdByLabel.get(parentLabel),
+      relationship_type: "RESOLVES_INTO",
+      scheme_id: SWADESH_SCHEME_ID,
+    });
   });
 
   // word_categories bridge (many-to-many): every word links to its broad
@@ -333,7 +394,17 @@ function buildRelationalTables(rows, includeSampleCitations){
   });
 
   // Sources/citations: only populated for the built-in sample dataset, since
-  // an arbitrary uploaded CSV carries no citation data to attach.
+  // an arbitrary uploaded CSV carries no citation data to attach. A citation
+  // attaches to the specific DEVELOPED_INTO edge it attests to (e.g.
+  // "Pokorny asserts this word derived from that root"), not to the word in
+  // isolation - mirroring how scheme is an edge property above, rather than
+  // a node property. Every word (other than ROOT) has exactly one incoming
+  // DEVELOPED_INTO edge (from its parent).
+  const developedIntoEdgeIdByTarget = new Map(
+    edges.filter(e => e.relationship_type === "DEVELOPED_INTO")
+         .map(e => [e.target_word_id, e.edge_id])
+  );
+
   const sources = [];
   const citations = [];
   if (includeSampleCitations){
@@ -345,13 +416,14 @@ function buildRelationalTables(rows, includeSampleCitations){
     });
     SAMPLE_CITATIONS.forEach(([csvId, sourceName, locus, note]) => {
       const wordId = wordIdByCsvId.get(csvId);
-      if (wordId === undefined) return;
-      citations.push({ citation_id: citations.length + 1, word_id: wordId,
+      const edgeId = developedIntoEdgeIdByTarget.get(wordId);
+      if (edgeId === undefined) return;
+      citations.push({ citation_id: citations.length + 1, edge_id: edgeId,
                         source_id: sourceIdByName.get(sourceName), locus: locus, note: note });
     });
   }
 
-  return { words, edges, semanticCategories, wordCategories, sources, citations };
+  return { words, edges, semanticSchemes, semanticCategories, categoryEdges, wordCategories, sources, citations };
 }
 
 function renderTable(container, rows, columns){
@@ -388,20 +460,24 @@ function renderTable(container, rows, columns){
 
 function build(rows, includeSampleCitations){
   try{
-    const { words, edges, semanticCategories, wordCategories, sources, citations } =
+    const { words, edges, semanticSchemes, semanticCategories, categoryEdges, wordCategories, sources, citations } =
       buildRelationalTables(rows, includeSampleCitations);
     renderTable(document.getElementById("wordsTableWrap"), words,
       ["word_id", "node_type", "id", "word", "meaning", "category", "tags"]);
     renderTable(document.getElementById("edgesTableWrap"), edges,
       ["edge_id", "source_word_id", "target_word_id", "relationship_type", "is_diachronic"]);
+    renderTable(document.getElementById("schemesTableWrap"), semanticSchemes,
+      ["scheme_id", "name"]);
     renderTable(document.getElementById("categoriesTableWrap"), semanticCategories,
-      ["category_id", "label", "parent_category_id"]);
+      ["category_id", "label"]);
+    renderTable(document.getElementById("categoryEdgesTableWrap"), categoryEdges,
+      ["category_edge_id", "child_category_id", "parent_category_id", "relationship_type", "scheme_id"]);
     renderTable(document.getElementById("wordCategoriesTableWrap"), wordCategories,
       ["word_id", "category_id"]);
     renderTable(document.getElementById("sourcesTableWrap"), sources,
       ["source_id", "name"]);
     renderTable(document.getElementById("citationsTableWrap"), citations,
-      ["citation_id", "word_id", "source_id", "locus", "note"]);
+      ["citation_id", "edge_id", "source_id", "locus", "note"]);
     setStatus(
       `Built ${words.length} words / ${edges.length} edges / ` +
       `${semanticCategories.length} categories / ${citations.length} citations.`,
