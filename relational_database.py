@@ -2,22 +2,27 @@ import pandas as pd
 import sqlite3
 
 # 1. Load your existing flat dataset
-# CSV columns: id, word, parent_id, meaning, category, tags
+# CSV columns: id, word, parent_id, meaning, category, tags, paradigm_id,
+# is_doubtful. is_doubtful marks entries Pokorny himself treats as an
+# uncertain/disputed member of the *ar- family (printed [CHECK] or hedged
+# with allegedly/vermutlich/vielleicht in the source) - preserved rather
+# than silently resolved either way.
 df = pd.read_csv("multilingual_tree_data.csv")
 
 # 2. Build the Words table: one entity row per unique id (node_type=WORD),
 # plus synthetic entity rows for each distinct language (tags). Semantic
 # categories are not baked in here - they live in their own self-referential
 # table (step 3) instead.
-words_df = df[["id", "word", "meaning", "category", "tags"]].drop_duplicates().reset_index(drop=True)
+words_df = df[["id", "word", "meaning", "category", "tags", "is_doubtful"]].drop_duplicates().reset_index(drop=True)
 words_df["node_type"] = "WORD"
 
 languages_df = pd.DataFrame({"word": sorted(df["tags"].dropna().unique())})
 languages_df["node_type"] = "LANGUAGE"
+languages_df["is_doubtful"] = None
 
 words_df = pd.concat([words_df, languages_df], ignore_index=True)
 words_df["word_id"] = words_df.index + 1
-words_df = words_df[["word_id", "node_type", "id", "word", "meaning", "category", "tags"]]
+words_df = words_df[["word_id", "node_type", "id", "word", "meaning", "category", "tags", "is_doubtful"]]
 
 word_id_by_csv_id = dict(zip(df["id"], words_df.loc[words_df["node_type"] == "WORD", "word_id"]))
 tags_by_csv_id = dict(zip(df["id"], df["tags"]))
@@ -27,20 +32,17 @@ language_word_id = dict(zip(
 ))
 
 # 3. Semantic schemes: the classification system a semantic category belongs
-# to. Three schemes are included so the scheme_id relation is actually
-# exercised rather than always pointing at the same row - names are
-# approximate labels (not verified against the real published schemes),
-# and the assignment below (which category goes to which scheme) is
-# illustrative for testing, not a scholarly mapping - placeholder until the
-# professor confirms the exact tagging-scheme/tag entity shape.
+# to. Names are approximate labels (not verified against the real published
+# schemes) - placeholder until the professor confirms the exact
+# tagging-scheme/tag entity shape. Swadesh List and Concepticon are kept in
+# the table (so the scheme_id relation remains real, general infrastructure)
+# but are currently unused - see the category_edges comment below for why.
 semantic_schemes_df = pd.DataFrame([
     {"scheme_id": 1, "name": "Buck's Schema (approximate)"},
     {"scheme_id": 2, "name": "Swadesh List (approximate)"},
     {"scheme_id": 3, "name": "Concepticon (approximate)"},
 ])
 BUCKS_SCHEME_ID = 1
-SWADESH_SCHEME_ID = 2
-CONCEPTICON_SCHEME_ID = 3
 
 # 4. Semantic categories: a self-referential table (arbitrary depth) rather
 # than baking a fixed CATEGORY/SUBCATEGORY pair into the words table. Tier 1
@@ -71,11 +73,15 @@ semantic_categories_df = pd.DataFrame(categories)
 # see step 4). Tier-1 categories have no parent category, so their edge's
 # parent_category_id is null and it resolves directly into the scheme
 # instead - the scheme acts as the implicit root of its own category tree.
-# Assigned to Buck's Schema for tier 1, except "Grammar" (a function-word
-# grouping that doesn't fit a semantic-field scheme) which resolves into
-# Concepticon instead, illustrating why more than one scheme is useful.
-# Tier 2 resolves into the Swadesh List, since that scheme is specifically a
-# list of basic/core concepts rather than broad fields.
+# Both tiers resolve into Buck's Schema uniformly here: the old toy
+# dataset's per-category scheme split (a "Grammar" exception routed to
+# Concepticon, subcategories routed to the Swadesh List) was illustrative
+# scaffolding for *that* data's quirks, not a real classification claim -
+# applying it to real Pokorny data without justification would be
+# fabricating scholarship, so it's not carried over. Swadesh/Concepticon
+# stay in semantic_schemes (the scheme_id relation itself is still real
+# infrastructure) but are currently unused until there's a genuine basis
+# for assigning something to them.
 category_edges = []
 for label, category_id in category_id_by_label.items():
     category_edges.append({
@@ -83,7 +89,7 @@ for label, category_id in category_id_by_label.items():
         "child_category_id": category_id,
         "parent_category_id": None,
         "relationship_type": "RESOLVES_INTO",
-        "scheme_id": CONCEPTICON_SCHEME_ID if label == "Grammar" else BUCKS_SCHEME_ID,
+        "scheme_id": BUCKS_SCHEME_ID,
     })
 for meaning, category_id in subcategory_id_by_meaning.items():
     parent_label = root_concepts.loc[root_concepts["meaning"] == meaning, "category"].iloc[0]
@@ -92,7 +98,7 @@ for meaning, category_id in subcategory_id_by_meaning.items():
         "child_category_id": category_id,
         "parent_category_id": category_id_by_label[parent_label],
         "relationship_type": "RESOLVES_INTO",
-        "scheme_id": SWADESH_SCHEME_ID,
+        "scheme_id": BUCKS_SCHEME_ID,
     })
 category_edges_df = pd.DataFrame(category_edges)
 
@@ -181,43 +187,35 @@ for paradigm_id, group in df.dropna(subset=["paradigm_id"]).groupby("paradigm_id
 edges_df = pd.DataFrame(edges).drop_duplicates().reset_index(drop=True)
 edges_df.insert(0, "edge_id", edges_df.index + 1)
 
-# 8. Sources and citations (LIV, Pokorny, OED). A citation attaches to the
-# specific DEVELOPED_INTO edge it attests to (e.g. "Pokorny asserts this
-# word derived from that root"), not to the word in isolation - mirroring
-# how scheme is an edge property above, rather than a node property.
-# multilingual_tree_data.csv carries no citation data of its own, so these
-# are illustrative sample citations for demonstrating the schema - loci/
-# notes are not verified against the physical dictionaries and should be
-# replaced with real citations when available.
+# 8. Sources and citations. A citation attaches to the specific
+# DEVELOPED_INTO edge it attests to (e.g. "Pokorny asserts this word
+# derived from that root"), not to the word in isolation - mirroring how
+# scheme is an edge property above, rather than a node property.
+# Every row in multilingual_tree_data.csv is drawn from Pokorny's actual
+# printed entry for *ar-, so every real DEVELOPED_INTO edge gets a genuine
+# Pokorny citation here - not fabricated bibliographic detail, just the
+# group membership already present in the tree structure (e.g. "t-Bildungen:
+# r̥t-, art- 'zusammengefügt'" is the real printed subsection header this
+# word appears under). LIV/OED citations from the old toy dataset are gone
+# since nothing in this real data is actually attested there.
 sources_df = pd.DataFrame([
-    {"source_id": 1, "name": "LIV", "full_name": "Lexikon der indogermanischen Verben"},
-    {"source_id": 2, "name": "Pokorny", "full_name": "Indogermanisches etymologisches Woerterbuch"},
-    {"source_id": 3, "name": "OED", "full_name": "Oxford English Dictionary"},
+    {"source_id": 1, "name": "Pokorny", "full_name": "Indogermanisches etymologisches Woerterbuch"},
 ])
-source_id_by_name = dict(zip(sources_df["name"], sources_df["source_id"]))
+POKORNY_SOURCE_ID = 1
 
-SAMPLE_CITATIONS = [
-    ("PIE_PTER", "Pokorny", "Pokorny 1959, p. 825, s.v. *pet-",
-     "Root meaning 'to fly, fall'; source for the 'wing/feather' word family."),
-    ("PIE_PTER", "LIV", "LIV, s.v. *peth2-",
-     "Verbal root 'to fly'; laryngeal-inclusive notation differs from Pokorny's older *pet-."),
-    ("PIE_AKW", "Pokorny", "Pokorny 1959, p. 775, s.v. *okw-",
-     "Root for 'to see, eye'."),
-    ("GER_AUGE", "OED", "OED, s.v. eye, n., Etymology",
-     "Cross-linguistic cognate note including Germanic *augo and PIE *h3ekw-."),
-    ("PIE_KWON", "Pokorny", "Pokorny 1959, p. 632, s.v. *kwon-",
-     "Root for 'dog'."),
-    ("LAT_CANIS", "OED", "OED, s.v. canine, adj., Etymology",
-     "Traces Latin canis to its PIE root."),
-    ("PIE_MATR", "Pokorny", "Pokorny 1959, p. 700, s.v. *mater-",
-     "Kinship term 'mother'."),
-    ("PIE_ED", "LIV", "LIV, s.v. *h1ed-",
-     "Verbal root 'to eat'."),
-    ("LAT_EDERE", "OED", "OED, s.v. edible, adj., Etymology",
-     "Traces Latin edere to PIE *h1ed-."),
-    ("PIE_NEBH", "Pokorny", "Pokorny 1959, p. 315, s.v. *nebh-",
-     "Root for 'cloud, mist, sky'."),
-]
+GROUP_IDS = {"AR_TBIL", "AR_MBIL1", "AR_MBIL2", "AR_WZFRE", "AR_REDH", "AR_WZFREI", "AR_REIDH"}
+parent_by_csv_id = dict(zip(df["id"], df["parent_id"]))
+word_by_csv_id = dict(zip(df["id"], df["word"]))
+
+
+def find_group_label(csv_id):
+    current = parent_by_csv_id.get(csv_id)
+    while current is not None and not pd.isna(current):
+        if current in GROUP_IDS:
+            return word_by_csv_id[current]
+        current = parent_by_csv_id.get(current)
+    return None
+
 
 # Every word (other than ROOT) has exactly one incoming DEVELOPED_INTO edge
 # (from its parent), so a citation about that word attaches to that edge.
@@ -226,16 +224,22 @@ develop_into_edge_id_by_target = dict(zip(
     edges_df.loc[edges_df["relationship_type"] == "DEVELOPED_INTO", "edge_id"],
 ))
 
-citations_df = pd.DataFrame([
-    {
-        "citation_id": i + 1,
-        "edge_id": develop_into_edge_id_by_target[word_id_by_csv_id[csv_id]],
-        "source_id": source_id_by_name[source_name],
+citations = []
+for row in df.itertuples():
+    edge_id = develop_into_edge_id_by_target.get(word_id_by_csv_id.get(row.id))
+    if edge_id is None:
+        continue
+    group_label = find_group_label(row.id)
+    locus = (f"Pokorny, IEW s.v. *ar- ({group_label})" if group_label
+             else "Pokorny, IEW s.v. *ar-")
+    citations.append({
+        "citation_id": len(citations) + 1,
+        "edge_id": edge_id,
+        "source_id": POKORNY_SOURCE_ID,
         "locus": locus,
-        "note": note,
-    }
-    for i, (csv_id, source_name, locus, note) in enumerate(SAMPLE_CITATIONS)
-])
+        "note": row.meaning,
+    })
+citations_df = pd.DataFrame(citations)
 
 # 9. Connect to a local SQLite database (creates 'etymology.db' automatically)
 con = sqlite3.connect("etymology.db")

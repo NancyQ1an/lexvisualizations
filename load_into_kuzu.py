@@ -41,20 +41,26 @@ conn = kuzu.Connection(db)
 
 # --- Schema ---
 conn.execute("CREATE NODE TABLE Word(word_id INT64, csv_id STRING, word STRING, "
-             "meaning STRING, category STRING, PRIMARY KEY(word_id))")
+             "meaning STRING, category STRING, is_doubtful BOOLEAN, PRIMARY KEY(word_id))")
 conn.execute("CREATE NODE TABLE Language(word_id INT64, name STRING, PRIMARY KEY(word_id))")
 conn.execute("CREATE NODE TABLE Category(category_id INT64, label STRING, PRIMARY KEY(category_id))")
 conn.execute("CREATE NODE TABLE Scheme(scheme_id INT64, name STRING, PRIMARY KEY(scheme_id))")
-conn.execute("CREATE NODE TABLE Source(source_id INT64, name STRING, full_name STRING, "
-             "PRIMARY KEY(source_id))")
-
+# Source is deliberately NOT a node table: no relationship ever points at a
+# source (citations are a self-contained property list on DevelopedInto, not
+# a separate CITED_BY edge - see the module docstring), so a standalone
+# Source node would never anchor any edge and would just be decoration. The
+# source's name/full_name are embedded directly in the citations struct
+# instead - this is a graph-projection choice, not a change to the SQL
+# schema, which keeps `sources` as its own normalized table for the reasons
+# documented in relational_database.py.
 conn.execute("""
     CREATE REL TABLE DevelopedInto(
         FROM Word TO Word,
         FROM Language TO Language,
         edge_id INT64,
         is_diachronic BOOLEAN,
-        citations STRUCT(source_id INT64, source_name STRING, locus STRING, note STRING)[]
+        citations STRUCT(source_id INT64, source_name STRING, source_full_name STRING,
+                          locus STRING, note STRING)[]
     )
 """)
 conn.execute("CREATE REL TABLE HasWord(FROM Language TO Word, edge_id INT64)")
@@ -71,41 +77,43 @@ conn.execute("CREATE REL TABLE HasCategory(FROM Word TO Category)")
 
 # --- Word / Language nodes ---
 word_node_ids = set()
-for word_id, node_type, csv_id, word, meaning, category, tags in cur.execute(
-    "SELECT word_id, node_type, id, word, meaning, category, tags FROM words"
+for word_id, node_type, csv_id, word, meaning, category, tags, is_doubtful in cur.execute(
+    "SELECT word_id, node_type, id, word, meaning, category, tags, is_doubtful FROM words"
 ):
     if node_type == "WORD":
         word_node_ids.add(word_id)
         conn.execute(
             "CREATE (w:Word {word_id: $word_id, csv_id: $csv_id, word: $word, "
-            "meaning: $meaning, category: $category})",
+            "meaning: $meaning, category: $category, is_doubtful: $is_doubtful})",
             {"word_id": word_id, "csv_id": csv_id, "word": word,
-             "meaning": meaning, "category": category},
+             "meaning": meaning, "category": category,
+             "is_doubtful": bool(is_doubtful) if is_doubtful is not None else False},
         )
     else:
         conn.execute("CREATE (l:Language {word_id: $word_id, name: $name})",
                       {"word_id": word_id, "name": word})
 
-# --- Category / Scheme / Source nodes ---
+# --- Category / Scheme nodes ---
 for category_id, label in cur.execute("SELECT category_id, label FROM semantic_categories"):
     conn.execute("CREATE (c:Category {category_id: $id, label: $label})",
                  {"id": category_id, "label": label})
 for scheme_id, name in cur.execute("SELECT scheme_id, name FROM semantic_schemes"):
     conn.execute("CREATE (s:Scheme {scheme_id: $id, name: $name})", {"id": scheme_id, "name": name})
-for source_id, name, full_name in cur.execute("SELECT source_id, name, full_name FROM sources"):
-    conn.execute("CREATE (so:Source {source_id: $id, name: $name, full_name: $full_name})",
-                 {"id": source_id, "name": name, "full_name": full_name})
 
 # --- Citations, pre-aggregated per edge_id into the list this relationship
-# property expects (one DEVELOPED_INTO edge can carry multiple citations,
-# e.g. both Pokorny and LIV citing the same claim). ---
+# property expects (the mechanism supports multiple citations per
+# DEVELOPED_INTO edge, even though every citation currently comes from the
+# same source - Pokorny - since that's the only source this dataset draws
+# from). Source name/full_name are joined in here directly rather than kept
+# as a separate graph node (see note above the DevelopedInto schema). ---
 citations_by_edge = {}
-for edge_id, source_id, source_name, locus, note in cur.execute(
-    "SELECT c.edge_id, c.source_id, s.name, c.locus, c.note "
+for edge_id, source_id, source_name, source_full_name, locus, note in cur.execute(
+    "SELECT c.edge_id, c.source_id, s.name, s.full_name, c.locus, c.note "
     "FROM citations c JOIN sources s ON c.source_id = s.source_id"
 ):
     citations_by_edge.setdefault(edge_id, []).append(
-        {"source_id": source_id, "source_name": source_name, "locus": locus, "note": note}
+        {"source_id": source_id, "source_name": source_name,
+         "source_full_name": source_full_name, "locus": locus, "note": note}
     )
 
 # --- DEVELOPED_INTO (word-to-word and language-to-language) ---
@@ -175,6 +183,6 @@ sq.close()
 
 counts = {
     label: conn.execute(f"MATCH (n:{label}) RETURN count(n)").get_next()[0]
-    for label in ("Word", "Language", "Category", "Scheme", "Source")
+    for label in ("Word", "Language", "Category", "Scheme")
 }
 print(f"Loaded into {DB_PATH}/: {counts}")

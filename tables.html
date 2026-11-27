@@ -116,57 +116,268 @@
 
 <script>
 const SAMPLE_CSV =
-`id,word,parent_id,meaning,category,tags,paradigm_id
-ROOT,*PIE,,Proto-Indo-European common ancestor,,PIE-root,
-PIE_PTER,*péth₂r̥,ROOT,wing / feather,Nature,PIE-root,
-GK_PTERON,πτερόν,PIE_PTER,wing / feather,Nature,Greek,
-LAT_PENNA,penna,PIE_PTER,feather / wing,Nature,Latin,
-SP_PENA,pluma,LAT_PENNA,feather,Nature,Spanish,
-TOC_PACE,päts,PIE_PTER,wing,Nature,Tocharian-B,
-PIE_AKW,*h₃ekʷ-,ROOT,eye / see,Body,PIE-root,
-GK_OPS,ὄψ,PIE_AKW,eye / face,Body,Greek,
-LAT_OCULUS,oculus,PIE_AKW,eye,Body,Latin,
-SP_OJO,ojo,LAT_OCULUS,eye,Body,Spanish,
-OHG_AUGE,ouga,PIE_AKW,eye,Body,OHG,
-GER_AUGE,Auge,OHG_AUGE,eye,Body,German,
-TOC_AK,ak,PIE_AKW,eye,Body,Tocharian-A,
-PIE_KWON,*ḱwón-,ROOT,dog,Animals,PIE-root,
-GK_KUON,κύων,PIE_KWON,dog,Animals,Greek,
-LAT_CANIS,canis,PIE_KWON,dog,Animals,Latin,
-SP_CAN,can,LAT_CANIS,dog / hound,Animals,Spanish,
-TOC_KU,ku,PIE_KWON,dog,Animals,Tocharian-A,
-PIE_MATR,*méh₂tēr,ROOT,mother,Family,PIE-root,
-GK_METER,μήτηρ,PIE_MATR,mother,Family,Greek,
-LAT_MATER,mater,PIE_MATR,mother,Family,Latin,
-SP_MADRE,madre,LAT_MATER,mother,Family,Spanish,
-TOC_MACER,mācer,PIE_MATR,mother,Family,Tocharian-B,
-OHG_MUOTER,muoter,PIE_MATR,mother,Family,OHG,
-GER_MUTTER,Mutter,OHG_MUOTER,mother,Family,German,
-PIE_ED,*h₁ed-,ROOT,to eat,Food,PIE-root,
-LAT_EDERE,edere,PIE_ED,to eat,Food,Latin,
-LAT_ESCA,esca,LAT_EDERE,food / bait,Food,Latin,
-SP_COMER,comer,LAT_EDERE,to eat,Food,Spanish,
-GK_EDO,ἔδω,PIE_ED,to eat,Food,Greek,
-TOC_IT,it-,PIE_ED,to eat,Food,Tocharian-A,
-PIE_NEBH,*nébʰos,ROOT,sky / cloud,Nature,PIE-root,
-GK_NEPHOS,νέφος,PIE_NEBH,cloud,Nature,Greek,
-LAT_NEBULA,nebula,PIE_NEBH,mist / fog,Nature,Latin,
-SP_NIEBLA,niebla,LAT_NEBULA,fog,Nature,Spanish,
-TOC_NEPO,nepo,PIE_NEBH,sky,Nature,Tocharian-B,
-PIE_TREYES,*tréyes,ROOT,three,Numbers,PIE-root,
-GK_TREIS,τρεῖς,PIE_TREYES,three,Numbers,Greek,
-LAT_TRES,tres,PIE_TREYES,three,Numbers,Latin,
-TOC_TRI,trai,PIE_TREYES,three,Numbers,Tocharian-A,
-PIE_ES,*h₁es-,ROOT,to be / exist,Grammar,PIE-root,
-PIE_WES,*h₂wes-,ROOT,to dwell / remain,Grammar,PIE-root,
-PIE_BHU,*bʰuH-,ROOT,to become / grow,Grammar,PIE-root,
-ENG_AM,am,PIE_ES,to be (1st sg. present),Grammar,English,ENG_BE
-ENG_IS,is,PIE_ES,to be (3rd sg. present),Grammar,English,ENG_BE
-ENG_ARE,are,PIE_ES,to be (plural / 2nd present),Grammar,English,ENG_BE
-ENG_WAS,was,PIE_WES,to be (singular past),Grammar,English,ENG_BE
-ENG_WERE,were,PIE_WES,to be (plural past),Grammar,English,ENG_BE
-ENG_BE,be,PIE_BHU,to be (infinitive),Grammar,English,ENG_BE
-ENG_BEEN,been,PIE_BHU,to be (past participle),Grammar,English,ENG_BE
+`id,word,parent_id,meaning,category,tags,paradigm_id,is_doubtful
+AR_ROOT,*ar-,,"zusammenfügen, passen",,PIE-root,,
+ARM_ERI,eri,AR_ROOT,"Bug, Schulter von Tieren",Physical Acts,Armenian,,TRUE
+AV_ARANTE,arānte,AR_ROOT,"sie setzen sich fest, bleiben stecken",Physical Acts,Avestan,,
+AI_ARAH,ará-ḥ,AR_ROOT,Radspeiche,Physical Acts,Sanskrit,,
+AI_ARAM,aram / álam,AR_ROOT,"passend, genug",Physical Acts,Sanskrit,,
+AI_ARAMKAR,áraṃkar- / alaṃkar,AI_ARAM,zurechtmachen und dienen,Physical Acts,Sanskrit,,
+AI_ARATI,ara-tí-,AI_ARAMKAR,Diener,Physical Acts,Sanskrit,,
+AI_RATI,rā-tí-,AI_ARAMKAR,bereitwillig,Physical Acts,Sanskrit,,
+AV_RAITI,rāiti,AI_ARAMKAR,"dienstwillig, Diener",Physical Acts,Avestan,,
+AV_AREM,arəm,AR_ROOT,"passend, entsprechend",Physical Acts,Avestan,,
+AV_AREMPITHWA,arə̄m-piϑwā,AV_AREM,Mittag,Physical Acts,Avestan,,
+AV_RAPITHWA,ra-piϑwā,AV_AREM,Mittag,Physical Acts,Avestan,,
+AV_RATU,ratu-,AR_ROOT,"Richter, Schiedsrichter und Zeitraum",Physical Acts,Avestan,,
+AI_ARPAYATI,ar-p-áyati,AR_ROOT,"steckt hinein, befestigt",Physical Acts,Sanskrit,,
+HETT_HARAP,ḫar-ap- / ḫarp-,AR_ROOT,hinstellen,Physical Acts,Hittite,,TRUE
+ARM_ARNEM,aṙnem,AR_ROOT,mache,Physical Acts,Armenian,,
+ARM_YAR,y-ar,AR_ROOT,"consentaneo, congiunto, contiguo, appresso",Physical Acts,Armenian,,
+ARM_ARAR,arar,AR_ROOT,hat gemacht,Physical Acts,Armenian,PARA_ARAR_ARARE,
+GR_ARARE,ἄραρε,AR_ROOT,hat gemacht,Physical Acts,Greek,PARA_ARAR_ARARE,
+ARM_YAREM,yarem,ARM_YAR,"aggiungere, congiungere",Physical Acts,Armenian,,
+ARM_CCAR,č̣ar,AR_ROOT,schlecht,Physical Acts,Armenian,,
+GR_ARARISKO,ἀραρίσκω,AR_ROOT,füge zusammen,Physical Acts,Greek,,
+GR_ARMENOS,ἄρμενος,AR_ROOT,"angefügt, passend",Physical Acts,Greek,,
+GR_OAR,ὄαρ,AR_ROOT,Gattin,Physical Acts,Greek,,TRUE
+GR_OARIZO,ὀαρίζω,GR_OAR,habe vertrauten Umgang,Physical Acts,Greek,,
+GR_CHALKOARAS,χαλκο-άρας,AR_ROOT,"erzgefügt, gepanzert",Physical Acts,Greek,,
+GR_CHERIARAS,χερι-άρας,AR_ROOT,"(attested with τέκτων, Pindar)",Physical Acts,Greek,,
+GR_ARTHRON,ἄρ-θρον,AR_ROOT,"Glied, Gelenk",Physical Acts,Greek,,
+GR_ARTHMOS,ἀρθμός,AR_ROOT,"Verbindung, Freundschaft",Physical Acts,Greek,,
+GR_ARTHMIOS,ἄρθμιος,GR_ARTHMOS,vereint,Physical Acts,Greek,,
+HOMER_DAMART,δάμ-αρ-τ-,AR_ROOT,Hausfrau,Physical Acts,Homeric-Greek,,
+AEOL_DOMORTIS,δόμορτις,HOMER_DAMART,Hausfrau,Physical Acts,Aeolic-Greek,,
+GR_PYLARTES,πυλάρτης,AR_ROOT,Hades als Verschließer des Unterweltstores,Physical Acts,Greek,,
+GR_ARESKO,ἀρέσκω,AR_ROOT,"gleiche aus, mache gut, befriedige",Physical Acts,Greek,,
+GR_ARESKEIMOI,ἀρέσκει μοι,GR_ARESKO,"es paßt, gefällt mir",Physical Acts,Greek,,
+GR_ARESKESTHAI,ἀρέσκεσθαι,GR_ARESKO,"sich verständigen, einig werden mit jemandem; sich geneigt machen, versöhnen",Physical Acts,Greek,,
+GR_ARESSASTHAI,ἀρέσσασθαι,GR_ARESKO,"sich verständigen, einig werden mit jemandem; sich geneigt machen, versöhnen",Physical Acts,Greek,,
+GR_ARETE,ἀρετή,AR_ROOT,Tüchtigkeit,Physical Acts,Greek,,
+GR_AREION,ἀρείων,AR_ROOT,besser,Physical Acts,Greek,,
+GR_ARI,ἀρι-,AR_ROOT,sehr (Präfix in Kompositis),Physical Acts,Greek,,TRUE
+GR_ARISTOS,ἄριστος,GR_AREION,"besser, best",Physical Acts,Greek,,
+GR_ARISTEROS,ἀριστερός,AR_ROOT,links,Physical Acts,Greek,,
+GR_THYMERES,θυμ-ήρης,AR_ROOT,wohlgefällig (mit Dehnung),Physical Acts,Greek,,
+GR_HOMEROS_N,ὅμηρος,AR_ROOT,"Gatte; Geisel, Unterpfand (mit Dehnung)",Physical Acts,Greek,,
+GR_HOMEREO,ὁμηρέω,GR_HOMEROS_N,treffe zusammen (mit Dehnung),Physical Acts,Greek,,
+GR_HOMEROS_PN,̓́Ομηρος,GR_HOMEROS_N,"Begleiter, der Blinde, der mit seinem Führer geht (mit Dehnung)",Physical Acts,Greek,,
+POLN_KOJARZYC,ko-jarzyć,AR_ROOT,"knüpfen, verbinden, vereinigen",Physical Acts,Polish,,TRUE
+TOCHA_ARWAR,ārwar,AR_ROOT,bereit,Physical Acts,Tocharian-A,,
+TOCHB_ARWER,ārwer / ārwar,TOCHA_ARWAR,bereit,Physical Acts,Tocharian-B,,
+TOCHA_AREM,aräm,AR_ROOT,Gesicht,Physical Acts,Tocharian-A,,
+TOCHB_ERE,ere,TOCHA_AREM,Gesicht,Physical Acts,Tocharian-B,,
+AR_TBIL,"t-Bildungen: r̥t-, art- 'zusammengefügt'",AR_ROOT,"t-Bildungen: r̥t-, art- 'zusammengefügt'",Physical Acts,PIE-root,,
+AI_RTA,r̥tá-,AR_TBIL,"passend, recht",Physical Acts,Sanskrit,,
+AI_RTAM,r̥tám,AR_TBIL,"wohlgefügte, heilige Ordnung",Physical Acts,Sanskrit,,
+AI_RTENA,r̥tēna,AI_RTA,rite,Physical Acts,Sanskrit,,
+AV_ARETA,arəta- / ərəta-,AR_TBIL,"Gesetz, Recht, heiliges Recht",Physical Acts,Avestan,,
+APERS_ARTA,arta-,AV_ARETA,"Gesetz, Recht, heiliges Recht",Physical Acts,Old-Persian,,
+AV_ASHA,aša-,AR_TBIL,"was recht, wahr ist",Physical Acts,Avestan,,
+AI_RTAVANT,r̥tāvan(t)-,AI_RTA,"ordnungsgemäß, gerecht",Physical Acts,Sanskrit,,
+AV_ASHAVAN,ašā̆van/t/-,AI_RTAVANT,"ordnungsgemäß, gerecht",Physical Acts,Avestan,,
+AI_RTUH,r̥tú-ḥ,AR_TBIL,"bestimmte Zeit, Ordnung, Regel",Physical Acts,Sanskrit,,
+AI_RTIH,r̥tí-ḥ,AR_TBIL,"Art, Weise",Physical Acts,Sanskrit,,
+AV_AIPIARETA,aipi-ərəta-,AR_TBIL,"bestimmt, fest zugewiesen",Physical Acts,Avestan,,
+ARM_ARD1,ard,AR_TBIL,"struttura, costruzione, ornamento",Physical Acts,Armenian,,
+ARM_ZARD,z-ard,ARM_ARD1,"apparatus, ornatus",Physical Acts,Armenian,,
+ARM_ARD2,ard,AR_TBIL,"soeben, jetzt",Physical Acts,Armenian,PARA_ARD2_ARTI,
+ARM_ARDAR,ardar,AR_TBIL,gerecht,Physical Acts,Armenian,,
+AV_AREDRA,arədra-,ARM_ARDAR,"getreu, zuverlässig, glaubenstreu, fromm",Physical Acts,Avestan,,TRUE
+ARM_ARDIUN,ardiun,AR_TBIL,struttura,Physical Acts,Armenian,,
+GR_HAMARTE,ἁμαρτή,AR_TBIL,gleichzeitig,Physical Acts,Greek,,
+GR_HOMARTEO,ὁμ-αρτέω,AR_TBIL,"schließe mich an jemanden an, begleite",Physical Acts,Greek,,
+GR_ARTIFEPES,ἀρτι-Fεπής,AR_TBIL,des Wortgefüges kundig,Physical Acts,Greek,,
+GR_ARTIPOUS,ἀρτί-πο(υ)ς,AR_TBIL,mit gesunden Füßen,Physical Acts,Greek,,
+GR_ARTIFRON,ἀρτί-φρων,AR_TBIL,mit fest(gefügt)em Verstande,Physical Acts,Greek,,
+GR_ARTAMOS,ἄρταμος,AR_TBIL,Schlächter; Mörder,Physical Acts,Greek,,TRUE
+GR_ARTAMEO,ἀρταμέω,GR_ARTAMOS,"schlachte, zerstückle",Physical Acts,Greek,,
+GR_ARTEMES,ἀρτεμής,AR_TBIL,frisch und gesund,Physical Acts,Greek,,TRUE
+GR_ARTI,ἄρτι,AR_TBIL,"eben, gerade",Physical Acts,Greek,PARA_ARD2_ARTI,
+ARM_ARDACIN,ard-a-cin,ARM_ARD2,neugeboren,Physical Acts,Armenian,,
+GR_APARTI,ἀπ-αρτί,GR_ARTI,"genau, gerade",Physical Acts,Greek,,
+GR_ARTIOS,ἄρτιος,GR_ARTI,"angemessen, gerade, vollkommen",Physical Acts,Greek,,
+GR_ARTIAZO,ἀρτιάζω,GR_ARTIOS,spiele gerade oder ungerade,Physical Acts,Greek,,
+GR_ARTIZO,ἀρτίζω,GR_ARTI,"mache fertig, bereite",Physical Acts,Greek,,
+GR_ARSION,ἄρσιον,AR_TBIL,δίκαιον,Physical Acts,Greek,,
+GR_ANARSIOS,ἀνάρσιος,GR_ARSION,feindlich,Physical Acts,Greek,,
+GR_EPARTES,ἐπαρτής,AR_TBIL,gerüstet,Physical Acts,Greek,,
+GR_ARTYN,ἀρτύν,AR_TBIL,φιλίαν καὶ σύμβασιν,Physical Acts,Greek,,
+GR_ARTYS,ἀρτύς,AR_TBIL,σύνταξις,Physical Acts,Greek,PARA_ARTYS_ARTUS,
+GR_ARTYO,ἀρτύω,GR_ARTYS,"füge zusammen, bereite",Physical Acts,Greek,,
+GR_ARTYNO,ἀρτύνω,GR_ARTYS,"füge zusammen, bereite",Physical Acts,Greek,,
+GR_ARTYNAS,ἀρτύ̄νας,AR_TBIL,"Beamtentitel (Argos, Epidauros, Thera)",Physical Acts,Greek,,
+GR_ARTYNOS,ἄρτῡνος,GR_ARTYNAS,"Beamtentitel (Argos, Epidauros, Thera)",Physical Acts,Greek,,
+GR_ARTYTER,ἀρτῡτήρ,GR_ARTYNAS,"Beamtentitel (Argos, Epidauros, Thera)",Physical Acts,Greek,,
+LAT_ARTUS_ENG,artus / artē,AR_TBIL,"eng in Raum und Zeit, straff",Physical Acts,Latin,,
+LAT_ARS,ars,AR_TBIL,"die Geschicklichkeit, Kunst, Art und Weise",Physical Acts,Latin,PARA_ARS_MHDART,
+LAT_INERS,in-ers,LAT_ARS,"kunstlos, träge",Physical Acts,Latin,,
+LAT_SOLLERS,soll-ers,LAT_ARS,geschickt,Physical Acts,Latin,,
+LAT_ALLERS,allers / alers,LAT_ARS,gelehrt,Physical Acts,Latin,,
+LAT_ARTIO,artiō / artāre,AR_TBIL,"fest zusammenfügen, zusammenpressen",Physical Acts,Latin,,
+LAT_ARTUS_GEL,artus,AR_TBIL,"Gelenk, Glied",Physical Acts,Latin,PARA_ARTYS_ARTUS,
+LAT_ARTICULUS,articulus,LAT_ARTUS_GEL,"Gelenk, Glied; Augenblick, Wendepunkt",Physical Acts,Latin,,
+LIT_ARTI,artì,AR_TBIL,nahe,Physical Acts,Lithuanian,,
+MHD_ART,art,AR_TBIL,Art und Weise,Physical Acts,Middle-High-German,PARA_ARS_MHDART,
+ANORD_EINARDR,ein-arđr,AR_TBIL,"einfach, aufrichtig",Physical Acts,Old-Norse,,
+ANORD_EINORD,einǫrd,ANORD_EINARDR,Zuverlässigkeit,Physical Acts,Old-Norse,,
+TOCHB_ARTKYE,ar(t)kye,AR_TBIL,"reich, wertvoll",Physical Acts,Tocharian-B,,TRUE
+AR_MBIL1,m-Bildungen; Von der leichten Basis ar-,AR_ROOT,m-Bildungen; Von der leichten Basis ar-,Physical Acts,PIE-root,,
+ARM_YARMAR,y-armar,AR_MBIL1,"passend, angemessen",Physical Acts,Armenian,,
+GR_HARMOS,ἁρμός,AR_MBIL1,"Fuge, Zusammenfügung, Gelenk",Physical Acts,Greek,,
+GR_HARMOI,ἁρμοῖ,AR_MBIL1,"eben, jüngst",Physical Acts,Greek,,
+GR_HARMOZO,ἁρμόζω,GR_HARMOI,"verbinde, füge zusammen, passe an, ordne",Physical Acts,Greek,,
+GR_HARMONIA,ἁρμονία,GR_HARMOI,"Verbindung, Bund, Ebenmaß, Einklang",Physical Acts,Greek,,
+GR_HARMA,ἅρμα,AR_MBIL1,Wagen,Physical Acts,Greek,,
+GR_HARMALIA,ἁρμαλιά,AR_MBIL1,"zugeteilte Nahrung, Proviant",Physical Acts,Greek,,
+LAT_ARMA,arma,AR_MBIL1,"Gerätschaften, Rüstzeug, Waffen",Physical Acts,Latin,,
+LAT_ARMENTUM,armentum,AR_MBIL1,Rudel von Pferden oder Rindern,Physical Acts,Latin,,
+ANORD_JORMUNI,jǫrmuni,LAT_ARMENTUM,"Rind, Pferd",Physical Acts,Old-Norse,,TRUE
+GOT_AIRMANAREIKS,*Aírmana-reiks,ANORD_JORMUNI,(Personenname),Physical Acts,Gothic,,
+AGS_EORMENRIC,Eormenrīc,GOT_AIRMANAREIKS,(Personenname),Physical Acts,Anglo-Saxon,,
+AISL_JORMUNREKR,Jǫrmunrekr,GOT_AIRMANAREIKS,(Personenname),Physical Acts,Old-Icelandic,,
+MHD_ERMENRICH,Ermenrīch,GOT_AIRMANAREIKS,(Personenname),Physical Acts,Middle-High-German,,
+LAT_ERMUNDURI,Ermunduri,ANORD_JORMUNI,Großthüringer (Stammesname),Physical Acts,Latin,,
+ANORD_JORMUNGRUND,jǫrmungrund,ANORD_JORMUNI,die weite Erde,Physical Acts,Old-Norse,PARA_JORMUNGRUND,
+AGS_EORMENGRUND,eormengrund,ANORD_JORMUNI,die weite Erde,Physical Acts,Anglo-Saxon,PARA_JORMUNGRUND,
+AHD_IRMINDEOT,irmindeot,ANORD_JORMUNGRUND,(no gloss printed),Physical Acts,OHG,,
+AS_IRMINSUL,Irmin-sūl,ANORD_JORMUNGRUND,(Personen-/Ortsname),Physical Acts,Old-Saxon,,
+LAT_HERMINONES,Herminones,ANORD_JORMUNI,"(Stammesname, Kurzform)",Physical Acts,Latin,,
+AKSL_JARMU,jarьmъ,AR_MBIL1,Joch,Physical Acts,Church-Slavonic,,
+SLOVEN_JERMEN,jérmen,AKSL_JARMU,"Jochriemen, Riemen",Physical Acts,Slovenian,,
+AKSL_REMEN,remenь,AR_MBIL1,Riemen,Physical Acts,Church-Slavonic,,
+SERB_REMEN,rè́mēn,AKSL_REMEN,Riemen,Physical Acts,Serbian,,
+TOCHB_YARM,yarm,AR_MBIL1,Maß,Physical Acts,Tocharian-B,,
+TOCHAB_YAERM,yärm,TOCHB_YARM,Maß,Physical Acts,Tocharian-AB,,
+AR_MBIL2,m-Bildungen; Von der schweren Basis arə-mo-: r̥̄-mo- 'Arm',AR_ROOT,m-Bildungen; Von der schweren Basis arə-mo-: r̥̄-mo- 'Arm',Body,PIE-root,,
+AI_IRMAH,īrmá-ḥ,AR_MBIL2,"Arm, Vorderbug",Body,Sanskrit,,
+AV_AREMA,arəma-,AI_IRMAH,Arm,Body,Avestan,,
+OSSET_AERM,ärm,AR_MBIL2,hohle Hand,Body,Ossetic,,
+OSSET_AELMAERIN,älm-ärịn / ärm-ärịn,OSSET_AERM,Ellenbogen,Body,Ossetic,,
+LAT_ARMUS,armus,AR_MBIL2,"der oberste Teil des Oberarms, Schulterblatt, bei Tieren der Vorderbug",Body,Latin,,
+GALL_ARAMO,aramō,AR_MBIL2,Gabelung,Body,Gallic,,
+GALL_ARAMONES,*aramones,GALL_ARAMO,Scherenarme der Deichsel,Body,Gallic,,
+APR_IRMO,irmo,AR_MBIL2,Arm,Body,Old-Prussian,,
+LIT_IRMEDE,ìrmėdė,AR_MBIL2,Gicht in den Gelenken,Body,Lithuanian,,
+LIT_IRMLIGA,irm-liga,LIT_IRMEDE,Gicht,Body,Lithuanian,,
+LIT_ARMAI,armaĩ,AR_MBIL2,Vorderarm am Wagen,Body,Lithuanian-Žemaitian,,
+AKSL_RAMO,ramo / ramę,AR_MBIL2,Schulter,Body,Church-Slavonic,,
+SERB_RAME,rà́me,AKSL_RAMO,Schulter,Body,Serbian,,
+GOT_ARMS,arms,AR_MBIL2,Arm,Body,Gothic,,
+AHD_ARM,arm,GOT_ARMS,Arm,Body,OHG,,
+ARM_ARMUKN,armukn,AR_MBIL2,Ellenbogen,Body,Armenian,,
+AR_WZFRE,"Wzf. rē-, rə-",AR_ROOT,"Wzf. rē-, rə-",Physical Acts,PIE-root,,
+LAT_REOR,reor / rērī,AR_WZFRE,"berechnen, meinen, dafürhalten",Physical Acts,Latin,,
+LAT_RATUS,ratus,LAT_REOR,"in der Meinung, berechnet, bestimmt, gültig, rechtskräftig",Physical Acts,Latin,,
+LAT_RATIO,ratiō,LAT_REOR,"Berechnung, Erwägung, Vernunft, Beweggrund, Grund",Physical Acts,Latin,,
+LAT_PROPORTIO,(prō)portiō,LAT_RATIO,(no gloss printed),Physical Acts,Latin,,TRUE
+GOT_GARATHJAN,*garaþjan / garaþana,AR_WZFRE,zählen,Physical Acts,Gothic,,
+ANORD_HUNDRADH,hundrađ,AR_WZFRE,hundert,Physical Acts,Old-Norse,,
+NHD_HUNDERT,Hundert,ANORD_HUNDRADH,Hundert,Physical Acts,German,,
+LAT_RATUM,rătum,ANORD_HUNDRADH,Zahl,Physical Acts,Latin,,
+AHD_GIRAD,girad,AR_WZFRE,gerad (nur von Zahlen),Physical Acts,OHG,,
+NHD_GERAD,gerad,AHD_GIRAD,gerad (nur von Zahlen),Physical Acts,German,,
+ANORD_TIROEDR,tī-rø̄đr,AR_WZFRE,nach Zehnern gezählt,Physical Acts,Old-Norse,,
+GOT_RATHJO,raþjō,AR_WZFRE,"Zahl, Rechnung, Rechenschaft",Physical Acts,Gothic,,
+AS_RETHIA,rethia,AR_WZFRE,Rechenschaft,Physical Acts,Old-Saxon,,
+AHD_RADJA,radja / redea,AR_WZFRE,"Rechenschaft, Rede und Antwort, Rede, Erzählung",Physical Acts,OHG,,
+AFRIES_BIRETHIA,birethia,AR_WZFRE,anklagen,Physical Acts,Old-Frisian,,
+AS_RETHION,rethiōn,AR_WZFRE,reden,Physical Acts,Old-Saxon,,
+AHD_REDION,red(i)ōn,AS_RETHION,reden,Physical Acts,OHG,,
+ANORD_ROEDH,rǫđ,AR_WZFRE,"Reihe, bes. dem Strande entlang ziehende Erhöhung",Physical Acts,Old-Norse,,TRUE
+MND_RAT_REIHE,rat,ANORD_ROEDH,Reihe,Physical Acts,Middle-Low-German,,TRUE
+AHD_RAMEN,rāmen,AR_WZFRE,"nach etwas trachten, streben, zielen",Physical Acts,OHG,,
+AS_ROMON,rōmon,AHD_RAMEN,streben,Physical Acts,Old-Saxon,,
+MHD_RAM,rām,AHD_RAMEN,Ziel,Physical Acts,Middle-High-German,,
+MND_RAM,rām,AHD_RAMEN,Ziel,Physical Acts,Middle-Low-German,,
+AR_REDH,"dh-Erweiterung rē-dh-, rō-dh-, rə-dh-",AR_WZFRE,"dh-Erweiterung rē-dh-, rō-dh-, rə-dh-",Physical Acts,PIE-root,,
+AI_RADHNOTI,rādhnṓti,AR_REDH,"macht (passend) zurecht, bringt zustande; gerät, gelingt, hat Glück womit; befriedigt, gewinnt jemanden",Physical Acts,Sanskrit,,
+AI_RADHYATI,rā́dhyati,AI_RADHNOTI,"macht (passend) zurecht, bringt zustande; gerät, gelingt, hat Glück womit; befriedigt, gewinnt jemanden",Physical Acts,Sanskrit,,
+AI_RADHAYATI,rādhayati,AI_RADHNOTI,"bringt zustande, befriedigt",Physical Acts,Sanskrit,,
+AI_RADHAH,rādha-ḥ / rādhaḥ,AI_RADHNOTI,"Segen, Gelingen, Wohltat, Gabe, Freigebigkeit",Physical Acts,Sanskrit,,
+AV_RADHAITI,rāδaiti,AR_REDH,macht bereit,Physical Acts,Avestan,,
+AV_RADHA,rāδa-,AR_REDH,Fürsorger,Physical Acts,Avestan,,
+AV_RADAH,rādah-,AR_REDH,"Sichbereitstellen, Bereitwilligkeit (in religiöser Hinsicht)",Physical Acts,Avestan,,
+APERS_RADIY,rādiy,AR_REDH,wegen,Physical Acts,Old-Persian,,
+NPERS_ARAYAD,ārāyad / ārāstan,AR_REDH,schmücken,Physical Acts,New-Persian,,
+AIR_IMMRADIM,imm-rādim,AR_REDH,"überlege, überdenke",Physical Acts,Old-Irish,,
+ACYMR_AMRAUD,amraud,AR_REDH,mens,Physical Acts,Old-Welsh,,
+NCYMR_AMRAWDD,amrawdd,ACYMR_AMRAUD,Gespräch,Physical Acts,New-Welsh,,
+AIR_NORAIDIU,no-rāidiu / no-rādim,AR_REDH,sage,Physical Acts,Old-Irish,,
+MCYMR_ADRAWD,adrawd,AIR_NORAIDIU,erzählen,Physical Acts,Middle-Welsh,,
+GOT_RODJAN,rōdjan,AIR_NORAIDIU,reden,Physical Acts,Gothic,,
+ANORD_ROEDHA,rø̄đa,GOT_RODJAN,reden,Physical Acts,Old-Norse,,
+NHD_REDE,Rede,GOT_RODJAN,Rede,Physical Acts,German,,TRUE
+NHD_REDEN,reden,GOT_RODJAN,reden,Physical Acts,German,,TRUE
+GOT_GAREDAN,garēdan,AR_REDH,"worauf bedacht sein, Vorsorge treffen",Physical Acts,Gothic,,
+GOT_URREDAN,urrēdan,AR_REDH,"urteilen, bestimmen",Physical Acts,Gothic,,
+GOT_UNDREDAN,undrēdan,AR_REDH,"besorgen, gewähren",Physical Acts,Gothic,,
+AHD_RATAN,rātan,AR_REDH,"raten, beratschlagen, worauf sinnen, anstiften, deuten (Rätsel), auffordern, wofür sorgen, verschaffen",Physical Acts,OHG,,
+AS_RADAN,rādan,AHD_RATAN,"raten, beratschlagen, worauf sinnen, anstiften, deuten (Rätsel), auffordern, wofür sorgen, verschaffen",Physical Acts,Old-Saxon,,
+ANORD_RADHA,rāđa,AHD_RATAN,"raten, beratschlagen, worauf sinnen, anstiften, deuten (Rätsel), auffordern, wofür sorgen, verschaffen",Physical Acts,Old-Norse,,
+AGS_RAEDAN,rǣdan,AHD_RATAN,"raten, beratschlagen, worauf sinnen, anstiften, deuten (Rätsel), auffordern, wofür sorgen, verschaffen; lesen",Physical Acts,Anglo-Saxon,,
+ENG_READ,read,AGS_RAEDAN,lesen,Physical Acts,English,,
+AHD_RAT,rāt,AR_REDH,"vorhandene Mittel, Rat, Ratschlag, Überlegung, Entschluß, Absicht, Vorsorge, Vorrat",Physical Acts,OHG,,
+AS_RAD,rād,AHD_RAT,"vorhandene Mittel, Rat, Ratschlag, Überlegung, Entschluß, Absicht, Vorsorge, Vorrat",Physical Acts,Old-Saxon,,
+ANORD_RAD,rād,AHD_RAT,"vorhandene Mittel, Rat, Ratschlag, Überlegung, Entschluß, Absicht, Vorsorge, Vorrat",Physical Acts,Old-Norse,,
+AGS_RAED,rǣd,AHD_RAT,"vorhandene Mittel, Rat, Ratschlag, Überlegung, Entschluß, Absicht, Vorsorge, Vorrat",Physical Acts,Anglo-Saxon,,
+AKSL_RADITI,raditi,AIR_NORAIDIU,sorgen,Physical Acts,Church-Slavonic,,
+SERB_RADIM,râdîm / ráditi,AKSL_RADITI,"arbeiten, trachten",Physical Acts,Serbian,,
+SERB_RAD,rad,AKSL_RADITI,"Geschäft, Arbeit",Physical Acts,Serbian,,
+AKSL_RADI,radi,APERS_RADIY,wegen,Physical Acts,Church-Slavonic,,
+AKSL_NERODU,nerodъ,AKSL_RADITI,Vernachlässigung,Physical Acts,Church-Slavonic,,
+SLOVEN_RODIM,rǫ́dim / rǫ́diti,AKSL_NERODU,"sorgen, sich kümmern",Physical Acts,Slovenian,,
+AR_WZFREI,"Wzf. (a)rī̆-, rēi-",AR_ROOT,"Wzf. (a)rī̆-, rēi-",Physical Acts,PIE-root,,
+GR_ARITHMOS,ἀριθμός,AR_WZFREI,Zahl,Physical Acts,Greek,,
+GR_NERITOS,νήριτος,AR_WZFREI,ungezählt,Physical Acts,Greek,,
+ARKAD_EPARITOS,ἐπάριτος,AR_WZFREI,"ἐπίλεκτος, auserlesen",Physical Acts,Arcadian-Greek,,
+GR_ARIMAZEI,ἀριμάζει,AR_WZFREI,ἁρμόζει,Physical Acts,Greek,,
+LAT_RITUS,rītus,AR_WZFREI,"hergebrachte Art der Religionsübung, Gebrauch, Sitte, Gewohnheit, Art",Physical Acts,Latin,,
+LAT_RITE,rīte,LAT_RITUS,"in passender Art, nach dem rechten religiösen Gebrauch",Physical Acts,Latin,,
+AIR_RIM,rīm,AR_WZFREI,Zahl,Physical Acts,Old-Irish,,
+AIR_ARAM,āram,AIR_RIM,Zahl,Physical Acts,Old-Irish,,
+AIR_DORIMU,do-rīmu,AIR_RIM,zähle,Physical Acts,Old-Irish,,
+CYMR_RHIF,rhif,AIR_RIM,Zahl,Physical Acts,Welsh,,
+ANORD_RIM,rīm,AIR_RIM,"Rechnung, Berechnung",Physical Acts,Old-Norse,,
+AS_UNRIM,unrīm,AIR_RIM,Unzahl,Physical Acts,Old-Saxon,,
+AGS_RIM,rīm,AIR_RIM,Zahl,Physical Acts,Anglo-Saxon,,
+AHD_RIM,rīm,AIR_RIM,"Reihe, Reihenfolge, Zahl",Physical Acts,OHG,,
+MHD_RIM,rīm,AHD_RIM,"Vers, Reim",Physical Acts,Middle-High-German,,
+LAT_RES,rēs,AR_WZFREI,Sache,Physical Acts,Latin,,TRUE
+AKSL_ORANDIJE,orądije,AR_WZFREI,"apparatus, instrumentum",Physical Acts,Church-Slavonic,,TRUE
+AKSL_REDU,rędъ,AR_WZFREI,Ordnung,Physical Acts,Church-Slavonic,,TRUE
+LIT_RINDA,rínda,AR_WZFREI,Reihe,Physical Acts,Lithuanian,,TRUE
+LETT_RINDA,riñda,AR_WZFREI,"Reihe, Zahl",Physical Acts,Latvian,,TRUE
+GR_ORDEO,ὀρδέω,AR_WZFREI,lege ein Gewebe an,Physical Acts,Greek,,TRUE
+GR_ORDIKON,ὀρδικόν,GR_ORDEO,τὸν χιτωνίσκον,Physical Acts,Greek,,TRUE
+GR_ORDEMA,ὄρδημα,GR_ORDEO,ἡ τολύπη τῶν ἐρίων,Physical Acts,Greek,,TRUE
+LAT_ORDIOR,ōrdior / ōrsus sum,GR_ORDEO,"anzetteln, anreihen, anfangen, beginnen",Physical Acts,Latin,,TRUE
+LAT_EXORDIOR,exōrdior,LAT_ORDIOR,zettle ein Gewebe an,Physical Acts,Latin,,TRUE
+LAT_REDORDIOR,redōrdior,LAT_ORDIOR,hasple ab,Physical Acts,Latin,,TRUE
+LAT_ORDO,ōrdo,LAT_ORDIOR,"Reihe, Ordnung",Physical Acts,Latin,,TRUE
+UMBR_URNASIER,urnasier,LAT_ORDO,(= lat. ordinariis?),Physical Acts,Umbrian,,TRUE
+GR_ARACHNE,ἀράχνη,AR_WZFREI,Spinne,Physical Acts,Greek,,TRUE
+LAT_ARANEUS,arāneus,GR_ARACHNE,zur Spinne gehörig,Physical Acts,Latin,,TRUE
+LAT_ARANEA,arānea,GR_ARACHNE,Spinne,Physical Acts,Latin,,TRUE
+GR_ARKYS,ἄρκυς,AR_WZFREI,Netz,Physical Acts,Greek,,TRUE
+GR_ARKANE,ἀρκάνη,GR_ARKYS,τὸ ῥάμμα ᾡ τὸν στήμονα ἐγκαταπλέκουσιναἱ διαζόμεναι,Physical Acts,Greek,,TRUE
+LETT_ERKULS,er'kuls,GR_ARKYS,Spindel; Wickel von Heede zum Spinnen,Physical Acts,Latvian,,TRUE
+AR_REIDH,dh-Erweiterung rēi-dh-,AR_WZFREI,dh-Erweiterung rēi-dh-,Physical Acts,PIE-root,,TRUE
+GOT_GARAITHS,garaiþs,AR_REIDH,"angeordnet, bestimmt",Physical Acts,Gothic,,TRUE
+GOT_RAIDJAN,raidjan,AR_REIDH,"verordnen, bestimmen",Physical Acts,Gothic,,TRUE
+GOT_GARAIDJAN,garaidjan,GOT_RAIDJAN,"verordnen, bestimmen",Physical Acts,Gothic,,TRUE
+ANORD_GREIDHR,g-reiđr,AR_REIDH,"bereit, leicht, klar",Physical Acts,Old-Norse,,TRUE
+ANORD_GREIDHA,greiđa,ANORD_GREIDHR,"auseinanderwickeln, ordnen, zurechtlegen, zustande bringen, entrichten, zahlen",Physical Acts,Old-Norse,,TRUE
+MHD_REITEN,reiten,AR_REIDH,"zurüsten, bereiten, zählen, rechnen, berechnen, bezahlen",Physical Acts,Middle-High-German,,TRUE
+MHD_REITE,reite,MHD_REITEN,bereit,Physical Acts,Middle-High-German,,TRUE
+MHD_GEREITE,gereite,MHD_REITEN,bereit,Physical Acts,Middle-High-German,,TRUE
+MHD_BEREITE,bereite,MHD_REITEN,bereit,Physical Acts,Middle-High-German,,TRUE
+AHD_BIREITI,bireiti,MHD_BEREITE,bereit,Physical Acts,OHG,,TRUE
+AHD_ANTREITI,antreitī,AR_REIDH,"series, ordo",Physical Acts,OHG,,TRUE
+LETT_RIEDU,riedu / rizt,AR_REIDH,ordnen,Physical Acts,Latvian,,TRUE
+LETT_RAIDS,raids,AR_REIDH,"bereit, fertig",Physical Acts,Latvian,,TRUE
+LETT_RIDI,ridi / ridas,AR_REIDH,"Gerät, Kram",Physical Acts,Latvian,,TRUE
 `;
 
 function setStatus(msg, kind){
@@ -185,33 +396,14 @@ document.getElementById("loadSample").addEventListener("click", () => {
   Papa.parse(SAMPLE_CSV, {header:true, dynamicTyping:true, skipEmptyLines:true, complete: r => build(r.data, true)});
 });
 
-// Sample sources/citations for the built-in sample dataset only -
-// multilingual_tree_data.csv carries no citation data of its own, and these
-// loci/notes are illustrative (not verified against the physical
-// dictionaries), included to demonstrate the sources/citations schema.
-const SAMPLE_SOURCES = ["LIV", "Pokorny", "OED"];
-const SAMPLE_CITATIONS = [
-  ["PIE_PTER", "Pokorny", "Pokorny 1959, p. 825, s.v. *pet-",
-   "Root meaning 'to fly, fall'; source for the 'wing/feather' word family."],
-  ["PIE_PTER", "LIV", "LIV, s.v. *peth2-",
-   "Verbal root 'to fly'; laryngeal-inclusive notation differs from Pokorny's older *pet-."],
-  ["PIE_AKW", "Pokorny", "Pokorny 1959, p. 775, s.v. *okw-",
-   "Root for 'to see, eye'."],
-  ["GER_AUGE", "OED", "OED, s.v. eye, n., Etymology",
-   "Cross-linguistic cognate note including Germanic *augo and PIE *h3ekw-."],
-  ["PIE_KWON", "Pokorny", "Pokorny 1959, p. 632, s.v. *kwon-",
-   "Root for 'dog'."],
-  ["LAT_CANIS", "OED", "OED, s.v. canine, adj., Etymology",
-   "Traces Latin canis to its PIE root."],
-  ["PIE_MATR", "Pokorny", "Pokorny 1959, p. 700, s.v. *mater-",
-   "Kinship term 'mother'."],
-  ["PIE_ED", "LIV", "LIV, s.v. *h1ed-",
-   "Verbal root 'to eat'."],
-  ["LAT_EDERE", "OED", "OED, s.v. edible, adj., Etymology",
-   "Traces Latin edere to PIE *h1ed-."],
-  ["PIE_NEBH", "Pokorny", "Pokorny 1959, p. 315, s.v. *nebh-",
-   "Root for 'cloud, mist, sky'."]
-];
+// Every row in multilingual_tree_data.csv is drawn from Pokorny's actual
+// printed entry for *ar-, so every real DEVELOPED_INTO edge gets a genuine
+// Pokorny citation (see buildRelationalTables below) - not fabricated
+// bibliographic detail, just the group membership already present in the
+// tree structure. Only populated for the built-in sample dataset, since an
+// arbitrary uploaded CSV isn't necessarily sourced from Pokorny.
+const SAMPLE_SOURCES = ["Pokorny"];
+const GROUP_IDS = new Set(["AR_TBIL", "AR_MBIL1", "AR_MBIL2", "AR_WZFRE", "AR_REDH", "AR_WZFREI", "AR_REIDH"]);
 
 // Mirrors relational_database.py: builds a normalized Words table (one row
 // per unique CSV id, node_type=WORD, plus a synthetic entity row per
@@ -232,7 +424,8 @@ function buildRelationalTables(rows, includeSampleCitations){
     const wordId = words.length + 1;
     wordIdByCsvId.set(String(r.id), wordId);
     words.push({ word_id: wordId, node_type: "WORD", id: r.id, word: r.word,
-                  meaning: r.meaning, category: r.category, tags: r.tags });
+                  meaning: r.meaning, category: r.category, tags: r.tags,
+                  is_doubtful: r.is_doubtful === true || r.is_doubtful === "TRUE" });
   });
 
   const tagsByCsvId = new Map(csvRows.map(r => [String(r.id), r.tags]));
@@ -242,24 +435,22 @@ function buildRelationalTables(rows, includeSampleCitations){
     const wordId = words.length + 1;
     languageWordId.set(tag, wordId);
     words.push({ word_id: wordId, node_type: "LANGUAGE", id: "", word: tag,
-                  meaning: "", category: "", tags: "" });
+                  meaning: "", category: "", tags: "", is_doubtful: false });
   });
 
   // Semantic schemes: the classification system a semantic category belongs
-  // to. Three schemes are included so the scheme_id relation is actually
-  // exercised rather than always pointing at the same row - names are
-  // approximate labels (not verified against the real published schemes),
-  // and the assignment below (which category goes to which scheme) is
-  // illustrative for testing, not a scholarly mapping - placeholder until
-  // the professor confirms the exact tagging-scheme/tag entity shape.
+  // to. Names are approximate labels (not verified against the real
+  // published schemes) - placeholder until the professor confirms the
+  // exact tagging-scheme/tag entity shape. Swadesh List and Concepticon are
+  // kept in the table (so the scheme_id relation remains real, general
+  // infrastructure) but are currently unused - see categoryEdges below for
+  // why.
   const semanticSchemes = [
     { scheme_id: 1, name: "Buck's Schema (approximate)" },
     { scheme_id: 2, name: "Swadesh List (approximate)" },
     { scheme_id: 3, name: "Concepticon (approximate)" },
   ];
   const BUCKS_SCHEME_ID = 1;
-  const SWADESH_SCHEME_ID = 2;
-  const CONCEPTICON_SCHEME_ID = 3;
 
   // Semantic categories: self-referential (tier 1 = broad category, tier 2 =
   // each root-level concept's meaning), instead of baking category/
@@ -291,12 +482,12 @@ function buildRelationalTables(rows, includeSampleCitations){
   // scheme_id as an edge property. Tier-1 categories have no parent category,
   // so their edge's parent_category_id is null and it resolves directly into
   // the scheme instead - the scheme acts as the implicit root of its own
-  // category tree. Assigned to Buck's Schema for tier 1, except "Grammar"
-  // (a function-word grouping that doesn't fit a semantic-field scheme)
-  // which resolves into Concepticon instead, illustrating why more than one
-  // scheme is useful. Tier 2 resolves into the Swadesh List, since that
-  // scheme is specifically a list of basic/core concepts rather than broad
-  // fields.
+  // category tree. Both tiers resolve into Buck's Schema uniformly: the old
+  // toy dataset's per-category scheme split (a "Grammar" exception routed to
+  // Concepticon, subcategories routed to the Swadesh List) was illustrative
+  // scaffolding for *that* data's quirks, not a real classification claim -
+  // applying it to real Pokorny data without justification would be
+  // fabricating scholarship, so it's not carried over.
   const categoryEdges = [];
   categoryIdByLabel.forEach((categoryId, label) => {
     categoryEdges.push({
@@ -304,7 +495,7 @@ function buildRelationalTables(rows, includeSampleCitations){
       child_category_id: categoryId,
       parent_category_id: null,
       relationship_type: "RESOLVES_INTO",
-      scheme_id: label === "Grammar" ? CONCEPTICON_SCHEME_ID : BUCKS_SCHEME_ID,
+      scheme_id: BUCKS_SCHEME_ID,
     });
   });
   subcategoryIdByMeaning.forEach((categoryId, meaning) => {
@@ -314,7 +505,7 @@ function buildRelationalTables(rows, includeSampleCitations){
       child_category_id: categoryId,
       parent_category_id: categoryIdByLabel.get(parentLabel),
       relationship_type: "RESOLVES_INTO",
-      scheme_id: SWADESH_SCHEME_ID,
+      scheme_id: BUCKS_SCHEME_ID,
     });
   });
 
@@ -414,12 +605,25 @@ function buildRelationalTables(rows, includeSampleCitations){
       sourceIdByName.set(name, sourceId);
       sources.push({ source_id: sourceId, name: name });
     });
-    SAMPLE_CITATIONS.forEach(([csvId, sourceName, locus, note]) => {
-      const wordId = wordIdByCsvId.get(csvId);
+    const pokornySourceId = sourceIdByName.get("Pokorny");
+    const parentByCsvId = new Map(csvRows.map(r => [String(r.id), r.parent_id]));
+    const wordByCsvId = new Map(csvRows.map(r => [String(r.id), r.word]));
+    const findGroupLabel = (csvId) => {
+      let current = parentByCsvId.get(String(csvId));
+      while (!isBlank(current)) {
+        if (GROUP_IDS.has(String(current))) return wordByCsvId.get(String(current));
+        current = parentByCsvId.get(String(current));
+      }
+      return null;
+    };
+    csvRows.forEach(r => {
+      const wordId = wordIdByCsvId.get(String(r.id));
       const edgeId = developedIntoEdgeIdByTarget.get(wordId);
       if (edgeId === undefined) return;
+      const groupLabel = findGroupLabel(r.id);
+      const locus = groupLabel ? `Pokorny, IEW s.v. *ar- (${groupLabel})` : "Pokorny, IEW s.v. *ar-";
       citations.push({ citation_id: citations.length + 1, edge_id: edgeId,
-                        source_id: sourceIdByName.get(sourceName), locus: locus, note: note });
+                        source_id: pokornySourceId, locus: locus, note: r.meaning });
     });
   }
 
@@ -463,7 +667,7 @@ function build(rows, includeSampleCitations){
     const { words, edges, semanticSchemes, semanticCategories, categoryEdges, wordCategories, sources, citations } =
       buildRelationalTables(rows, includeSampleCitations);
     renderTable(document.getElementById("wordsTableWrap"), words,
-      ["word_id", "node_type", "id", "word", "meaning", "category", "tags"]);
+      ["word_id", "node_type", "id", "word", "meaning", "category", "tags", "is_doubtful"]);
     renderTable(document.getElementById("edgesTableWrap"), edges,
       ["edge_id", "source_word_id", "target_word_id", "relationship_type", "is_diachronic"]);
     renderTable(document.getElementById("schemesTableWrap"), semanticSchemes,
